@@ -1,17 +1,18 @@
 {
+  "id": "/",
   "name": "Mi Caja — Más Pisto",
   "short_name": "Mi Caja",
   "description": "Tu flujo de caja, en tus manos. Control de flujo de caja, inventario de billetes y arqueos.",
-  "start_url": "./index.html",
-  "scope": "./",
+  "start_url": "/",
+  "scope": "/",
   "display": "standalone",
   "orientation": "portrait-primary",
   "background_color": "#FFF4EC",
   "theme_color": "#F5831F",
   "lang": "es-HN",
   "icons": [
-    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
-    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
-    { "src": "icon-512-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ]
 }
