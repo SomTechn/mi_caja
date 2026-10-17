@@ -757,6 +757,17 @@ function calcular() {
   const ids = Object.keys(RES);
   if (!UI.banco || !RES[UI.banco]) UI.banco = ids.find(id => RES[id].tot.nS || RES[id].tot.nB) || ids[0] || null;
 }
+/* Mes contable de la financiera: del 9 de un mes al 8 del siguiente; se nombra por el mes en que inicia */
+const MESES_N = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+function mesContable(f) {
+  let y = +f.slice(0, 4), m = +f.slice(5, 7);
+  if (+f.slice(8, 10) < 9) { m -= 1; if (m < 1) { m = 12; y -= 1; } }
+  const p = n => String(n).padStart(2, '0');
+  const ny = m === 12 ? y + 1 : y, nm = m === 12 ? 1 : m + 1;
+  return { desde: `${y}-${p(m)}-09`, hasta: `${ny}-${p(nm)}-08` };
+}
+const mesContableActivo = () => { if (!UI.desde || !UI.hasta) return false; const m = mesContable(UI.desde); return m.desde === UI.desde && m.hasta === UI.hasta; };
+const nombreMesContable = f => `${MESES_N[+f.slice(5, 7) - 1][0].toUpperCase() + MESES_N[+f.slice(5, 7) - 1].slice(1)} ${f.slice(0, 4)} · 09/${f.slice(5, 7)} al 08/${mesContable(f).hasta.slice(5, 7)}`;
 function vConciliar() {
   const hayDatos = Object.keys(ST.sis).length || Object.keys(ST.mov).some(k => (ST.mov[k] || []).length);
   if (!hayDatos) return vInicio();
@@ -769,7 +780,11 @@ function vConciliar() {
     <div class="row" style="gap:6px">
       <button class="btn sm" data-act="rango" data-k="dia">Último día cargado</button>
       <button class="btn sm" data-act="rango" data-k="semana">7 días</button>
-      <button class="btn sm" data-act="rango" data-k="mes">Mes</button>
+    </div>
+    <div class="row mesc" style="gap:4px;align-items:center">
+      <button class="btn sm" data-act="mesNav" data-d="-1" aria-label="Mes contable anterior">‹</button>
+      <button class="btn sm ${mesContableActivo() ? 'pri' : ''}" data-act="rango" data-k="mesc">${mesContableActivo() ? esc(nombreMesContable(UI.desde)) : 'Mes contable'}</button>
+      <button class="btn sm" data-act="mesNav" data-d="1" aria-label="Mes contable siguiente">›</button>
     </div>
     <div style="margin-left:auto" class="row">
       <button class="btn" data-act="copiarPend" ${r ? '' : 'disabled'}>Copiar pendientes</button>
@@ -1185,7 +1200,7 @@ function exportar() {
   const add = (rows, name) => XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows.length ? rows : [{ '': 'Sin datos' }]), name);
   add(resumen, 'Resumen'); add(all.ps, 'Solo en sistema'); add(all.pb, 'Solo en banco'); add(all.conc, 'Conciliados'); add(all.dias, 'Por día'); add(all.just, 'Justificados');
   const out = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
-  const nombre = `Conciliacion ${UI.desde}${UI.hasta !== UI.desde ? ' a ' + UI.hasta : ''}.xlsx`;
+  const nombre = mesContableActivo() ? `Conciliacion mes contable ${MESES_N[+UI.desde.slice(5, 7) - 1]} ${UI.desde.slice(0, 4)}.xlsx` : `Conciliacion ${UI.desde}${UI.hasta !== UI.desde ? ' a ' + UI.hasta : ''}.xlsx`;
   descargar(nombre, new Blob([out], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
 }
 function copiarPendientes() {
@@ -1233,8 +1248,15 @@ document.addEventListener('click', e => {
       const fs = Object.keys(ST.sis).sort(); const last = fs.length ? fs[fs.length - 1] : hoy();
       if (el.dataset.k === 'dia') { UI.desde = UI.hasta = last; }
       else if (el.dataset.k === 'semana') { UI.hasta = last; UI.desde = E.addDays(last, -6); }
-      else { UI.hasta = last; UI.desde = last.slice(0, 8) + '01'; }
+      else { const m = mesContable(last); UI.desde = m.desde; UI.hasta = m.hasta; }
       UI.sel.clear(); render(); asegurarMovs(UI.desde).then(render);
+    },
+    mesNav: () => {
+      const base = mesContableActivo() ? UI.desde : mesContable(UI.hasta || hoy()).desde;
+      const y = +base.slice(0, 4), mo = +base.slice(5, 7) + (+el.dataset.d);
+      const d = new Date(Date.UTC(y, mo - 1, 9));
+      const m = mesContable(d.toISOString().slice(0, 10));
+      UI.desde = m.desde; UI.hasta = m.hasta; UI.sel.clear(); render(); asegurarMovs(UI.desde).then(render);
     },
     exportar, copiarPend: copiarPendientes,
     vincular1: async () => { const l = { s: [el.dataset.s], b: [el.dataset.b], nota: '' }; try { await dbLink(l); } catch (e) { return; } ST.man.links.push(l); render(); },
