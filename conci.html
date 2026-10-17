@@ -124,6 +124,10 @@ td .sub{color:var(--muted);font-size:12px}
 .avisos{margin:0;padding-left:18px;color:var(--warn);font-size:13.5px}
 .okmsg{color:var(--ok);font-weight:600}
 .banco-h td{background:var(--accent-soft)}
+.justform select{max-width:100%}
+ul.hist{margin:8px 0 0;padding-left:18px;font-size:13px;color:var(--muted)}
+ul.hist li{margin-bottom:4px}
+ul.hist b{color:var(--ink)}
 .justform{display:flex;gap:6px;flex-wrap:wrap;width:100%}
 .justform input{flex:1;min-width:180px}
 .nota-just{font-size:13.5px;margin-top:4px;padding:6px 8px;background:var(--sunk);border-radius:6px;overflow-wrap:anywhere}
@@ -567,7 +571,7 @@ const BANCOS_BASE = [
   { id:'banrural', nombre:'Banrural', alias:['banrural'], antes:0, despues:1, finde:false, nocturno:false, activo:true }
 ];
 const CARGOS_BASE = E.CARGOS_BASE;
-const vacio = () => ({ cfg:{ bancos: structuredClone(BANCOS_BASE), feriados:[], cuentas:{}, cargos: CARGOS_BASE.slice() }, mov:{}, sis:{}, man:{ links:[], just:{}, noAuto:[] }, cierres: [] });
+const vacio = () => ({ cfg:{ bancos: structuredClone(BANCOS_BASE), feriados:[], cuentas:{}, cargos: CARGOS_BASE.slice() }, mov:{}, sis:{}, man:{ links:[], just:{}, noAuto:[] }, cierres: [], casos: [], empleados: [] });
 let ST = vacio();
 let REAL = null;            // guarda el estado real mientras se ve el ejemplo
 let ejemplo = false;
@@ -615,7 +619,11 @@ async function cargar() {
   const nuevo = vacio();
   const { data: permitido, error: ep } = await SB.rpc('cb_permitido');
   if (ep) throw ep;
-  if (!permitido) { FASE.v = 'sinPermiso'; return; }
+  if (!permitido) {
+    const { data: mios, error: em } = await SB.from('cb_casos').select('*').order('created_at');
+    if (em) throw em;
+    ST = { ...vacio(), casos: mios || [] }; FASE.v = 'responsable'; return;
+  }
   const { data: cfg, error: ec } = await SB.from('cb_config').select('data').eq('id', 1).maybeSingle();
   if (ec) throw ec;
   if (cfg && cfg.data && cfg.data.bancos) nuevo.cfg = { bancos: cfg.data.bancos, feriados: cfg.data.feriados || [], cuentas: cfg.data.cuentas || {}, cargos: cfg.data.cargos || CARGOS_BASE.slice() };
@@ -627,6 +635,8 @@ async function cargar() {
     todos(() => SB.from('cb_cierres').select('id,banco,desde,hasta,datos,diferencia,nota,created_at,created_by').order('desde'))
   ]);
   nuevo.cierres = cierres;
+  const [casosR, empR] = await Promise.all([SB.from('cb_casos').select('*').order('created_at'), SB.rpc('cb_empleados')]);
+  nuevo.casos = casosR.data || []; nuevo.empleados = empR.data || [];
   sis.forEach(r => nuevo.sis[r.fecha] = { secciones: r.secciones, avisos: r.avisos || [], texto: r.texto || '', por: r.updated_by, guardado: r.updated_at });
   nuevo.man.links = links.map(r => ({ id: r.id, s: r.s || [], b: r.b || [], nota: r.nota || '', por: r.created_by }));
   just.forEach(r => nuevo.man.just[r.item_id] = { nota: r.nota || '', por: r.created_by });
@@ -665,6 +675,16 @@ const dbDesJust = ids => w(SB && SB.from('cb_justificados').delete().in('item_id
 async function dbCierre(row) {
   if (ejemplo) { toast('Cierre guardado (ejemplo, no se guarda)'); return { ...row, id: 'ej' + Date.now(), created_at: ahora(), created_by: usr() }; }
   const { data } = await w(SB.from('cb_cierres').upsert({ ...row, created_at: ahora(), created_by: usr() }, { onConflict: 'banco,desde,hasta' }).select('id,banco,desde,hasta,datos,diferencia,nota,created_at,created_by').single(), 'Cierre guardado');
+  return data;
+}
+async function dbCrearCaso(row) {
+  if (ejemplo) { toast('Enviado (ejemplo, no se guarda)'); return { ...row, id: 'ej' + Date.now(), estado: 'pendiente', created_at: ahora(), updated_at: ahora() }; }
+  const { data } = await w(SB.from('cb_casos').insert(row).select('*').single(), 'Enviado');
+  return data;
+}
+async function dbActualizarCaso(id, patch, msg) {
+  if (ejemplo) { toast((msg || 'Guardado') + ' (ejemplo, no se guarda)'); return { ...ST.casos.find(c => c.id == id), ...patch }; }
+  const { data } = await w(SB.from('cb_casos').update({ ...patch, updated_at: ahora() }).eq('id', id).select('*').single(), msg);
   return data;
 }
 const dbBorrarCierre = id => w(SB && SB.from('cb_cierres').delete().eq('id', id), 'Cierre borrado');
@@ -709,13 +729,13 @@ async function descargar(filename, data) {
   const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = filename; document.body.appendChild(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(a.href), 4000);
 }
-async function copiar(texto) {
-  try { await navigator.clipboard.writeText(texto); toast('Copiado. Péguelo en Excel.'); }
-  catch (e) { const ta = document.createElement('textarea'); ta.value = texto; document.body.appendChild(ta); ta.select(); try { document.execCommand('copy'); toast('Copiado. Péguelo en Excel.'); } catch (_) { toast('No se pudo copiar'); } ta.remove(); }
+async function copiar(texto, msg = 'Copiado. Péguelo en Excel.') {
+  try { await navigator.clipboard.writeText(texto); toast(msg); }
+  catch (e) { const ta = document.createElement('textarea'); ta.value = texto; document.body.appendChild(ta); ta.select(); try { document.execCommand('copy'); toast(msg); } catch (_) { toast('No se pudo copiar'); } ta.remove(); }
 }
 
 /* ================== Navegación ================== */
-const UI = { justAbierto: null, cierreIn: {}, verCierre: null, rD: null, rH: null, tab: 'conciliar', banco: null, desde: null, hasta: null, vista: 'pend', sel: new Set(), imp: null, sisPrev: null, sisFecha: null, sisTexto: '', verDia: null, confirm: null };
+const UI = { casoAbierto: null, segFiltro: 'abiertos', verCaso: null, casoNota: null, casoAccion: null, justAbierto: null, cierreIn: {}, verCierre: null, rD: null, rH: null, tab: 'conciliar', banco: null, desde: null, hasta: null, vista: 'pend', sel: new Set(), imp: null, sisPrev: null, sisFecha: null, sisTexto: '', verDia: null, confirm: null };
 try { const t = localStorage.getItem('concilia.tab'); if (t) UI.tab = t; } catch (e) {}
 $('#tabs').addEventListener('click', e => {
   const b = e.target.closest('button[data-tab]'); if (!b) return;
@@ -732,6 +752,7 @@ function vAcceso() {
   const err = FASE.msg ? `<div class="banner err">${esc(FASE.msg)}</div>` : '';
   if (FASE.v === 'cargando') return `<div class="panel empty">Cargando datos de conciliación…</div>`;
   if (FASE.v === 'error') return `<div class="panel stack acceso">${err}<div class="row"><button class="btn pri" data-act="recargarTodo">Reintentar</button>${SUPABASE_URL ? '' : '<button class="btn" data-act="cambiarConexion">Cambiar conexión</button>'}${USER ? '<button class="btn ghost" data-act="salir">Cerrar sesión</button>' : ''}</div></div>`;
+  if (FASE.v === 'responsable') return vResponsable();
   if (FASE.v === 'sinPermiso') return `<div class="panel stack acceso"><h2 style="font-size:20px">Su usuario no tiene acceso</h2><p class="muted" style="margin:0">Entró como <b>${esc(usr())}</b>, pero este correo no está autorizado para la conciliación. Pida que lo agreguen en la tabla <b>cb_usuarios</b> de Supabase.</p><div class="row"><button class="btn" data-act="recargarTodo">Ya me agregaron</button><button class="btn ghost" data-act="salir">Cerrar sesión</button></div></div>`;
   if (FASE.v === 'config') return `<form class="panel stack acceso" id="formConfig"><h2 style="font-size:20px">Conectar con Supabase</h2><p class="muted small" style="margin:0">Se hace una sola vez en este equipo. Los datos están en Supabase → Project Settings → API.</p>${err}
     <label class="f">URL del proyecto<input type="text" id="cfgUrl" placeholder="https://xxxxxxxx.supabase.co" autocomplete="off" required></label>
@@ -866,6 +887,7 @@ function vCierre(r) {
       <div class="kv"><span>Sistema: inicial + movimientos pegados = final</span>${Math.abs(c.librosFin - c.librosCalc) < 0.005 ? '<span class="pill ok">Correcto</span>' : `<span class="pill bad">Dif. ${fmt(c.librosFin - c.librosCalc)}</span>`}</div>
       <div class="kv"><span>Saldo inicial sistema vs banco</span>${Math.abs(c.Iv) < 0.005 ? '<span class="pill ok">Iguales</span>' : `<span class="pill warn">Dif. ${fmt(c.Iv)}</span>`}</div>
       <div class="kv"><span>Movimientos conciliados</span><span class="num">${c.conciliados}</span></div>
+      <div class="kv"><span>Casos abiertos en seguimiento</span>${(() => { const n = (ST.casos || []).filter(k => k.banco === c.bid && k.estado !== 'confirmado' && k.f >= c.desde && k.f <= c.hasta).length; return n ? `<span class="pill warn">${n}</span>` : '<span class="pill ok">0</span>'; })()}</div>
     </div>
   </div>
   <div class="tw"><table class="estado"><tbody>
@@ -939,6 +961,88 @@ function vHistorial() {
   return h + `</tbody></table></div></div></div>`;
 }
 
+/* ================== Seguimiento: correcciones y revisiones con responsable ================== */
+const TIPOS_CASO = { correccion: 'Corrección en sistema', revision_banco: 'Revisión en cuenta bancaria' };
+const ESTADOS_CASO = { pendiente: ['bad', 'Pendiente'], corregido: ['warn', 'Corregido · por confirmar'], confirmado: ['ok', 'Confirmado'] };
+const casosAbiertosPorItem = () => { const m = {}; for (const c of ST.casos || []) if (c.estado !== 'confirmado') m[c.item_id] = c; return m; };
+const diasDesde = ts => { const t = new Date(ts).getTime(); return isNaN(t) ? 0 : Math.max(0, Math.floor((Date.now() - t) / 864e5)); };
+function pillCaso(c) {
+  const [cls] = ESTADOS_CASO[c.estado];
+  return `<span class="pill ${cls}">${c.tipo === 'revision_banco' ? 'En revisión bancaria' : 'En corrección'} · ${esc(c.responsable_nombre || 'Sin responsable')} · ${ESTADOS_CASO[c.estado][1]}</span>`;
+}
+function formCaso(x) {
+  const emps = ST.empleados || [];
+  return `<div class="justform">
+    <select id="casoTipo">${x.lado === 's' ? `<option value="correccion">Corrección en sistema</option><option value="revision_banco">Revisión en cuenta bancaria</option>` : `<option value="correccion">Corrección en sistema</option>`}</select>
+    <select id="casoResp"><option value="">Responsable…</option>${emps.map(e => `<option value="${esc(e.id)}">${esc(e.nombre)}${e.cargo ? ' · ' + esc(e.cargo) : ''}</option>`).join('')}</select>
+    <input type="text" id="casoInstr" placeholder="Qué debe revisar o corregir" maxlength="300">
+    <button class="btn sm pri" data-act="crearCaso" data-id="${esc(x.id)}">Enviar</button><button class="btn sm" data-act="cancelarCaso">Cancelar</button></div>`;
+}
+function sigueStatus(c) { // ¿el movimiento sigue pendiente en la conciliación actual?
+  for (const r of Object.values(RES)) for (const x of [...r.soloSis, ...r.soloBan]) if (x.id === c.item_id && E.cents(x.monto) === E.cents(c.monto)) return true;
+  return false;
+}
+function mensajeCaso(c) {
+  return [`${TIPOS_CASO[c.tipo]} pendiente`, `Banco: ${bancoN(c.banco)}`, `Fecha: ${fdl(c.f)}`, `Registro: ${(c.doc ? c.doc + ' ' : '') + (c.descripcion || '')}`, `Monto: ${fmt(c.dir === 'in' ? +c.monto : -c.monto)}`,
+    c.instruccion ? `Instrucción: ${c.instruccion}` : '', `Cuando esté listo, márquelo como corregido en: ${location.href.split('#')[0]}`].filter(Boolean).join('\n');
+}
+const fechaHora = ts => { const d = new Date(ts); if (isNaN(d)) return ''; const p = n => String(n).padStart(2, '0'); return `${p(d.getDate())}/${p(d.getMonth() + 1)}/${d.getFullYear()} ${p(d.getHours())}:${p(d.getMinutes())}`; };
+function historialHtml(c) {
+  const A = { creado: 'Enviado', corregido: 'Marcado como corregido', confirmado: 'Confirmado', devuelto: 'Devuelto para corregir' };
+  return `<ul class="hist">${(c.historial || []).map(h => `<li><b>${A[h.accion] || h.accion}</b> · ${fechaHora(h.ts)} · ${esc(h.por || '')}${h.nota ? `<div>${esc(h.nota)}</div>` : ''}</li>`).join('')}</ul>`;
+}
+function vSeguimiento() {
+  const f = UI.segFiltro || 'abiertos';
+  const todos = ST.casos || [];
+  const cuenta = { abiertos: todos.filter(c => c.estado !== 'confirmado').length, pendiente: todos.filter(c => c.estado === 'pendiente').length, corregido: todos.filter(c => c.estado === 'corregido').length, confirmado: todos.filter(c => c.estado === 'confirmado').length, todos: todos.length };
+  const lista = todos.filter(c => f === 'todos' || (f === 'abiertos' ? c.estado !== 'confirmado' : c.estado === f));
+  const orden = ST.cfg.bancos.map(b => b.id);
+  lista.sort((a, b) => orden.indexOf(a.banco) - orden.indexOf(b.banco) || (a.f < b.f ? -1 : a.f > b.f ? 1 : 0));
+  const filtros = [['abiertos', 'Abiertos'], ['pendiente', 'Pendientes'], ['corregido', 'Por confirmar'], ['confirmado', 'Confirmados'], ['todos', 'Todos']];
+  let h = `<div class="stack"><div class="row" style="gap:6px">${filtros.map(([k, l]) => `<button class="date-chip" data-act="segFiltro" data-k="${k}" aria-pressed="${f === k}">${l} <span class="num">${cuenta[k]}</span></button>`).join('')}</div>
+    <p class="muted small" style="margin:0">Todos los bancos y fechas. El responsable entra con su usuario, ve sus casos y los marca como corregidos; usted confirma cuando todo está bien.</p>`;
+  if (!lista.length) return h + `<div class="panel empty">No hay casos en esta vista. Envíe un pendiente a corrección o a revisión desde la lista de Pendientes.</div></div>`;
+  h += `<div class="list">`;
+  for (const c of lista) {
+    const [cls, lbl] = ESTADOS_CASO[c.estado];
+    const sigue = sigueStatus(c);
+    h += `<div class="item caso"><span></span><div class="main">
+      <div class="row" style="gap:6px;margin-bottom:4px"><span class="pill ${c.tipo === 'revision_banco' ? 'acc' : ''}">${TIPOS_CASO[c.tipo]}</span><span class="pill ${cls}">${lbl}</span>${c.estado !== 'confirmado' ? `<span class="small muted">${diasDesde(c.created_at)} días</span>` : ''}</div>
+      <div class="d"><b>${esc(bancoN(c.banco))}</b> · ${fd(c.f)} · ${c.lado === 's' ? 'Sistema' : 'Banco'} · ${esc((c.doc ? c.doc + ' ' : '') + (c.descripcion || ''))}</div>
+      <div class="meta">Responsable: <b>${esc(c.responsable_nombre || '—')}</b>${c.instruccion ? ' · ' + esc(c.instruccion) : ''}</div>
+      ${c.estado !== 'confirmado' ? `<div class="small" style="margin-top:4px">${sigue ? '<span class="pill">Sigue pendiente en la conciliación</span>' : '<span class="pill ok">Ya no aparece pendiente</span>'}</div>` : ''}
+      ${UI.verCaso == c.id ? historialHtml(c) : ''}
+    </div><div class="amt num ${c.dir}">${fmt(c.dir === 'in' ? +c.monto : -c.monto)}</div>
+    <div class="acts">${UI.casoNota == c.id ? `<div class="justform"><input type="text" id="casoNota" placeholder="Comentario" maxlength="300"><button class="btn sm pri" data-act="${UI.casoAccion}" data-id="${c.id}">${UI.casoAccion === 'devolverCaso' ? 'Devolver' : UI.casoAccion === 'corregirCaso' ? 'Marcar corregido' : (sigue ? 'Confirmar y justificar' : 'Confirmar')}</button><button class="btn sm" data-act="cancelarNotaCaso">Cancelar</button></div>` : `
+      ${c.estado === 'pendiente' ? `<button class="btn sm" data-act="abrirNotaCaso" data-a="corregirCaso" data-id="${c.id}">Marcar corregido</button>` : ''}
+      ${c.estado === 'corregido' ? `<button class="btn sm pri" data-act="abrirNotaCaso" data-a="confirmarCaso" data-id="${c.id}">Confirmar</button><button class="btn sm" data-act="abrirNotaCaso" data-a="devolverCaso" data-id="${c.id}">Devolver</button>` : ''}
+      ${c.estado === 'pendiente' ? `<button class="btn sm ghost" data-act="abrirNotaCaso" data-a="confirmarCaso" data-id="${c.id}">Confirmar sin esperar</button>` : ''}
+      <button class="btn sm ghost" data-act="copiarCaso" data-id="${c.id}">Copiar mensaje</button>
+      <button class="btn sm ghost" data-act="verCaso" data-id="${c.id}">${UI.verCaso == c.id ? 'Ocultar historial' : 'Historial'}</button>`}</div></div>`;
+  }
+  return h + `</div></div>`;
+}
+/* Vista para el responsable que no es usuario de conciliación: solo sus casos */
+function vResponsable() {
+  const mios = ST.casos || [];
+  const abiertos = mios.filter(c => c.estado === 'pendiente');
+  let h = `<div class="stack"><div class="panel stack"><div class="row" style="justify-content:space-between;align-items:center"><h2 style="font-size:20px">Mis correcciones</h2><div class="row small muted">${esc(usr())}<button class="btn sm" data-act="salir">Cerrar sesión</button></div></div>
+    <p class="muted small" style="margin:0">Registros que le enviaron para corregir en el sistema o revisar en la cuenta bancaria. Cuando termine, márquelo como corregido y escriba qué hizo.</p></div>`;
+  if (!mios.length) return h + `<div class="panel empty">No tiene correcciones asignadas.</div></div>`;
+  h += `<div class="list">`;
+  for (const c of [...abiertos, ...mios.filter(c => c.estado !== 'pendiente')]) {
+    const [cls, lbl] = ESTADOS_CASO[c.estado];
+    h += `<div class="item caso"><span></span><div class="main">
+      <div class="row" style="gap:6px;margin-bottom:4px"><span class="pill ${c.tipo === 'revision_banco' ? 'acc' : ''}">${TIPOS_CASO[c.tipo]}</span><span class="pill ${cls}">${lbl}</span></div>
+      <div class="d"><b>${esc(bancoN(c.banco))}</b> · ${fdl(c.f)} · ${esc((c.doc ? c.doc + ' ' : '') + (c.descripcion || ''))}</div>
+      ${c.instruccion ? `<div class="nota-just">${esc(c.instruccion)}</div>` : ''}
+      ${historialHtml(c)}
+    </div><div class="amt num ${c.dir}">${fmt(c.dir === 'in' ? +c.monto : -c.monto)}</div>
+    <div class="acts">${c.estado === 'pendiente' ? `<div class="justform"><input type="text" id="nota-${c.id}" placeholder="Qué corrigió o qué encontró" maxlength="300"><button class="btn sm pri" data-act="respCorregido" data-id="${c.id}">Marcar como corregido</button></div>` : ''}</div></div>`;
+  }
+  return h + `</div></div>`;
+}
+
 function vConciliar() {
   const hayDatos = Object.keys(ST.sis).length || Object.keys(ST.mov).some(k => (ST.mov[k] || []).length);
   if (!hayDatos) return vInicio();
@@ -982,13 +1086,14 @@ function vConciliar() {
   </div>`;
   if (r.sinEstado) h += `<div class="banner ex">No hay estado de cuenta de ${esc(bancoN(r.bancoId))} cargado. Súbalo en <b>Estados de cuenta</b> para poder cruzar.</div>`;
   const grupos = gruposCargos();
-  const tabs = [['pend', 'Pendientes', t.nPendS + t.nPendB], ['cargos', 'Cargos bancarios', grupos.length], ['conc', 'Conciliados', r.matches.length], ['dias', 'Por día', r.dias.length], ['just', 'Justificados', r.justificados.length], ['cierre', 'Cierre', '']];
+  const tabs = [['pend', 'Pendientes', t.nPendS + t.nPendB], ['cargos', 'Cargos bancarios', grupos.length], ['conc', 'Conciliados', r.matches.length], ['dias', 'Por día', r.dias.length], ['just', 'Justificados', r.justificados.length], ['seguimiento', 'Seguimiento', (ST.casos || []).filter(c => c.estado !== 'confirmado').length], ['cierre', 'Cierre', '']];
   h += `<div class="seg" role="tablist">${tabs.map(([k, l, n]) => `<button data-act="vista" data-k="${k}" aria-selected="${UI.vista === k}">${l}<span class="n">${n}</span></button>`).join('')}</div>`;
   if (UI.vista === 'pend') h += vPendientes(r);
   else if (UI.vista === 'conc') h += vConciliados(r);
   else if (UI.vista === 'cargos') h += vCargos(grupos);
   else if (UI.vista === 'dias') h += vDias(r);
   else if (UI.vista === 'cierre') h += vCierre(r);
+  else if (UI.vista === 'seguimiento') h += vSeguimiento();
   else h += vJustificados(r);
   return h + `</div>`;
 }
@@ -1014,7 +1119,7 @@ function itemHtml(x, lado) {
     <input type="checkbox" data-act="sel" data-id="${esc(x.id)}" ${sel ? 'checked' : ''} aria-label="Seleccionar">
     <div class="main"><div class="d">${desc}</div><div class="meta">${meta}</div></div>
     <div class="amt num ${x.dir}">${x.dir === 'out' ? '−' : ''}${fmt(x.monto).replace('L ', 'L ')}</div>
-    <div class="acts">${UI.justAbierto === x.id ? formJust(x.id, '') : `${fl}<button class="btn sm ghost" data-act="justificar" data-id="${esc(x.id)}">Justificar</button>`}</div>
+    <div class="acts">${UI.justAbierto === x.id ? formJust(x.id, '') : UI.casoAbierto === x.id ? formCaso(x) : (() => { const c = casosAbiertosPorItem()[x.id]; return `${c ? pillCaso(c) : ''}${fl}${c ? '' : `<button class="btn sm" data-act="abrirCaso" data-id="${esc(x.id)}">Enviar a corrección${x.lado === 's' ? ' o revisión' : ''}</button>`}<button class="btn sm ghost" data-act="justificar" data-id="${esc(x.id)}">Justificar</button>`; })()}</div>
   </div>`;
 }
 function vPendientes(r) {
@@ -1474,6 +1579,54 @@ document.addEventListener('click', e => {
     verCierre: () => { UI.verCierre = UI.verCierre == el.dataset.id ? null : el.dataset.id; UI.confirm = null; render(); },
     abrirCierre: () => { const c = ST.cierres.find(x => x.id == el.dataset.id); if (!c) return; UI.desde = c.desde; UI.hasta = c.hasta; UI.banco = c.banco; UI.vista = 'cierre'; UI.tab = 'conciliar'; render(); asegurarMovs(c.desde).then(render); },
     borrarCierre: async () => { const id = el.dataset.id; try { await dbBorrarCierre(id); } catch (e) { return; } ST.cierres = ST.cierres.filter(x => x.id != id); UI.confirm = null; UI.verCierre = null; render(); },
+    abrirCaso: () => { if (!(ST.empleados || []).length && !ejemplo) toast('No se pudo cargar la lista de empleados'); UI.casoAbierto = el.dataset.id; UI.justAbierto = null; render(); },
+    cancelarCaso: () => { UI.casoAbierto = null; render(); },
+    crearCaso: async () => {
+      const id = el.dataset.id; const r = RES[UI.banco];
+      const x = [...r.soloSis, ...r.soloBan].find(i => i.id === id); if (!x) return;
+      const respId = $('#casoResp').value; if (!respId) return toast('Elija el responsable');
+      const emp = (ST.empleados || []).find(e => e.id === respId) || {};
+      const instr = $('#casoInstr').value.trim();
+      const row = { tipo: $('#casoTipo').value, item_id: x.id, lado: x.lado, banco: UI.banco, f: x.f, doc: x.doc || null, descripcion: x.desc, monto: x.monto, dir: x.dir,
+        responsable_id: respId, responsable_nombre: emp.nombre || null, responsable_user: emp.user_id || null, instruccion: instr || null, estado: 'pendiente', created_at: ahora(), created_by: usr(),
+        historial: [{ ts: ahora(), por: usr(), accion: 'creado', nota: instr }] };
+      let c; try { c = await dbCrearCaso(row); } catch (e) { return; }
+      ST.casos = [...(ST.casos || []), c]; UI.casoAbierto = null;
+      if (!emp.user_id) toast(`${emp.nombre} no tiene usuario: copie el mensaje en Seguimiento y envíeselo`);
+      render();
+    },
+    segFiltro: () => { UI.segFiltro = el.dataset.k; render(); },
+    verCaso: () => { UI.verCaso = UI.verCaso == el.dataset.id ? null : el.dataset.id; render(); },
+    copiarCaso: () => { const c = ST.casos.find(k => k.id == el.dataset.id); if (c) copiar(mensajeCaso(c), 'Mensaje copiado. Envíelo al responsable.'); },
+    abrirNotaCaso: () => { UI.casoNota = el.dataset.id; UI.casoAccion = el.dataset.a; render(); const i = $('#casoNota'); if (i) i.focus(); },
+    cancelarNotaCaso: () => { UI.casoNota = null; render(); },
+    corregirCaso: async () => {
+      const id = el.dataset.id, nota = ($('#casoNota') || {}).value || '';
+      if (ejemplo) { const c = ST.casos.find(k => k.id == id); c.estado = 'corregido'; c.historial = [...(c.historial || []), { ts: ahora(), por: usr(), accion: 'corregido', nota }]; UI.casoNota = null; return render(); }
+      const { data, error } = await SB.rpc('cb_marcar_corregido', { p_id: +id, p_nota: nota });
+      if (error || !data) return toast('No se pudo marcar: ' + (error?.message || 'el caso ya no está pendiente'));
+      const { data: c } = await SB.from('cb_casos').select('*').eq('id', id).single();
+      ST.casos = ST.casos.map(k => k.id == id ? c : k); UI.casoNota = null; toast('Marcado como corregido'); render();
+    },
+    confirmarCaso: async () => {
+      const id = el.dataset.id, nota = ($('#casoNota') || {}).value || ''; const c0 = ST.casos.find(k => k.id == id);
+      const sigue = sigueStatus(c0);
+      let c; try { c = await dbActualizarCaso(id, { estado: 'confirmado', historial: [...(c0.historial || []), { ts: ahora(), por: usr(), accion: 'confirmado', nota }] }, 'Confirmado'); } catch (e) { return; }
+      if (sigue) { const n = `Confirmado en seguimiento${nota ? ': ' + nota : ''}${c0.instruccion ? ' (' + c0.instruccion + ')' : ''}`; try { await dbJust([c0.item_id], n); ST.man.just[c0.item_id] = { nota: n, por: usr() }; } catch (e) {} }
+      ST.casos = ST.casos.map(k => k.id == id ? c : k); UI.casoNota = null; render();
+    },
+    devolverCaso: async () => {
+      const id = el.dataset.id, nota = ($('#casoNota') || {}).value || ''; const c0 = ST.casos.find(k => k.id == id);
+      let c; try { c = await dbActualizarCaso(id, { estado: 'pendiente', historial: [...(c0.historial || []), { ts: ahora(), por: usr(), accion: 'devuelto', nota }] }, 'Devuelto al responsable'); } catch (e) { return; }
+      ST.casos = ST.casos.map(k => k.id == id ? c : k); UI.casoNota = null; render();
+    },
+    respCorregido: async () => {
+      const id = el.dataset.id, nota = ($('#nota-' + id) || {}).value || '';
+      if (!nota.trim()) return toast('Escriba qué corrigió o qué encontró');
+      const { data, error } = await SB.rpc('cb_marcar_corregido', { p_id: +id, p_nota: nota });
+      if (error || !data) return toast('No se pudo marcar: ' + (error?.message || 'el caso ya no está pendiente'));
+      const { data: mios } = await SB.from('cb_casos').select('*').order('created_at'); ST.casos = mios || []; toast('Marcado como corregido. Gracias.'); render();
+    },
     exportar, copiarPend: copiarPendientes,
     vincular1: async () => { const l = { s: [el.dataset.s], b: [el.dataset.b], nota: '' }; try { await dbLink(l); } catch (e) { return; } ST.man.links.push(l); render(); },
     vincularSel: async () => {
