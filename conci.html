@@ -126,6 +126,7 @@ td .sub{color:var(--muted);font-size:12px}
 .banco-h td{background:var(--accent-soft)}
 .th-sort{border:0;background:none;padding:0;font:inherit;color:inherit;text-transform:inherit;letter-spacing:inherit;cursor:pointer}
 .th-sort:hover{color:var(--ink)}
+tr.banda td{background:var(--sunk)}
 pre.logjson{white-space:pre-wrap;font-size:11.5px;background:var(--sunk);padding:8px;border-radius:6px;max-height:260px;overflow:auto;margin:6px 0 0}
 .justform select{max-width:100%}
 ul.hist{margin:8px 0 0;padding-left:18px;font-size:13px;color:var(--muted)}
@@ -1145,8 +1146,8 @@ function filasMovimientos() {
     }
   }
   const k = UI.movSort.k, s = UI.movSort.dir === 'asc' ? 1 : -1, orden = ST.cfg.bancos.map(b => b.id);
-  const val = x => k === 'monto' ? (x.cred || -x.deb) : k === 'banco' ? orden.indexOf(x.banco) : x.f;
-  out.sort((a, b) => { const va = val(a), vb = val(b); return (va < vb ? -1 : va > vb ? 1 : (a.orden || 0) - (b.orden || 0)) * s; });
+  const val = x => k === 'monto' ? Math.round((x.cred || x.deb) * 100) : k === 'banco' ? orden.indexOf(x.banco) : x.f;
+  out.sort((a, b) => { const va = val(a), vb = val(b); if (va !== vb) return (va < vb ? -1 : 1) * s; return a.f < b.f ? -1 : a.f > b.f ? 1 : (a.orden || 0) - (b.orden || 0); });
   return out;
 }
 const ESTADO_MOV = { conciliado: ['ok', 'Conciliado'], pendiente: ['bad', 'Pendiente'], cargo: ['acc', 'Cargo sin registrar'], justificado: ['', 'Justificado'] };
@@ -1167,10 +1168,14 @@ function vMovimientos() {
   <div class="row" style="justify-content:space-between;align-items:center"><span class="small muted"><b class="num">${filas.length}</b> movimientos · créditos <b class="num in">${fmt(cred)}</b> · débitos <b class="num out">${fmt(deb)}</b></span>
     <div class="row"><button class="btn" data-act="copiarMovs">Copiar</button><button class="btn" data-act="exportarMovs">Exportar Excel</button></div></div>
   <div class="tw"><table><thead><tr>${th('f', 'Fecha')}${th('banco', 'Banco')}<th>Descripción</th><th>Ref.</th>${th('monto', 'Monto', 'r')}<th class="r">Saldo</th><th>Estado</th></tr></thead><tbody>`;
+  const signos = {}; for (const x of filas) { const c = Math.round((x.cred || x.deb) * 100); (signos[c] ||= new Set()).add(x.cred > 0 ? 'in' : 'out'); }
+  const ordenMonto = UI.movSort.k === 'monto'; let prevC = null, banda = false;
   for (const x of filas.slice(0, lim)) {
     const [cls, lbl] = ESTADO_MOV[x.st.e];
+    const cAbs = Math.round((x.cred || x.deb) * 100); const ambos = signos[cAbs].size > 1;
+    if (ordenMonto && cAbs !== prevC) { banda = !banda; prevC = cAbs; }
     const con = x.st.e === 'conciliado' ? `<div class="sub">${esc(TIPO[x.st.t]?.[1] || '')}${x.st.s && x.st.s.length ? ' · ' + esc(x.st.s.map(s => (s.doc || '') + ' ' + fd(s.f)).slice(0, 2).join(', ')) : ''}</div>` : '';
-    h += `<tr><td>${fd(x.f)}<div class="sub">${x.f.slice(0, 4)}</div></td><td>${esc(bancoN(x.banco))}</td><td>${esc(x.desc)}${x.cod ? `<div class="sub">${esc(x.cod)}</div>` : ''}</td><td class="small">${esc(x.ref || '')}</td><td class="r num ${x.cred > 0 ? 'in' : 'out'}">${fmt(x.cred > 0 ? x.cred : -x.deb)}</td><td class="r num small">${x.saldo != null ? fmt(x.saldo) : ''}</td><td><span class="pill ${cls}">${lbl}</span>${con}</td></tr>`;
+    h += `<tr class="${ordenMonto && banda ? 'banda' : ''}"><td>${fd(x.f)}<div class="sub">${x.f.slice(0, 4)}</div></td><td>${esc(bancoN(x.banco))}</td><td>${esc(x.desc)}${x.cod ? `<div class="sub">${esc(x.cod)}</div>` : ''}</td><td class="small">${esc(x.ref || '')}</td><td class="r num ${x.cred > 0 ? 'in' : 'out'}">${fmt(x.cred > 0 ? x.cred : -x.deb)}${ambos ? '<div><span class="pill warn" title="El mismo monto aparece como crédito y como débito">± pareja</span></div>' : ''}</td><td class="r num small">${x.saldo != null ? fmt(x.saldo) : ''}</td><td><span class="pill ${cls}">${lbl}</span>${con}</td></tr>`;
   }
   h += `</tbody></table></div>`;
   if (filas.length > lim) h += `<div class="row"><button class="btn" data-act="movMas">Mostrar ${Math.min(200, filas.length - lim)} más (de ${filas.length - lim})</button></div>`;
