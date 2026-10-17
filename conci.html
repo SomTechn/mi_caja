@@ -403,6 +403,12 @@ const E = (() => {
   const tiene = (txt, keys) => { const d = norm(txt); return (keys || CARGOS_BASE).some(k => k && d.includes(norm(k))); };
   const esCargo = (x, keys) => x.dir === 'out' && tiene(x.desc, keys);
   const esRegistroCargo = (s, keys) => /^gb$/i.test(String(s.doc || '').trim()) || tiene(s.desc, keys);
+  /* Identificador de cada registro del sistema por su contenido (no por su posición), para que
+     vínculos, justificados y casos sigan apuntando al mismo registro al volver a pegar el día */
+  function idsSistema(f, bancoId, items) {
+    const occ = {};
+    return (items || []).map(it => { const k = `${f}|${bancoId}|${String(it.doc || '').trim()}|${cents(it.monto)}|${it.dir}`; occ[k] = (occ[k] || 0) + 1; return k + '#' + occ[k]; });
+  }
   function subset(pool, target, maxK, budget = 60000) {
     pool = pool.filter(x => x.c <= target).sort((a, b) => b.c - a.c);
     const suf = new Array(pool.length + 1).fill(0);
@@ -433,10 +439,11 @@ const E = (() => {
     for (const [f, dia] of Object.entries(sis || {})) {
       const d = dn(f); if (d < mDesde - span || d > mHasta + span) continue;
       const sec = dia.secciones && dia.secciones[bancoId]; if (!sec) continue;
+      const ids = idsSistema(f, bancoId, sec.items);
       sec.items.forEach((it, i) => {
         if (it.movidoA) return; // se registró en este banco pero se movió al banco correcto
         const w = ventana(f, cfg, fer);
-        S.push({ lado: 's', id: `${f}|${bancoId}|${i}`, f, dn: d, dir: it.dir, c: cents(it.monto), monto: it.monto, doc: it.doc, desc: it.desc, w });
+        S.push({ lado: 's', id: ids[i], f, dn: d, dir: it.dir, c: cents(it.monto), monto: it.monto, doc: it.doc, desc: it.desc, w });
       });
     }
     for (const it of mov || []) {
@@ -574,7 +581,7 @@ const E = (() => {
       }
     }
   }
-  return { CARGOS_BASE, esCargo, norm, fixText, parseFecha, parseMonto, cents, dn, fromDn, dow, addDays, parseSistema, detectarBanco, detectarColumnas, extraerMovs, revisarSaldos, conciliar, cruzarBancos, ventana };
+  return { CARGOS_BASE, esCargo, idsSistema, norm, fixText, parseFecha, parseMonto, cents, dn, fromDn, dow, addDays, parseSistema, detectarBanco, detectarColumnas, extraerMovs, revisarSaldos, conciliar, cruzarBancos, ventana };
 })();
 if (typeof module !== 'undefined') module.exports = E;
 
@@ -666,6 +673,7 @@ async function cargar() {
   ST.movDesde = E.addDays(ultimo < hoy() ? ultimo : hoy(), -DIAS_CARGA);
   await cargarMovs(ST.movDesde);
   FASE.v = 'app';
+  await migrarIds();
 }
 /* Escrituras: se aplican en pantalla y se guardan en Supabase */
 function w(promesa, okMsg) {
@@ -805,6 +813,43 @@ function rangoDefecto() {
   const fechas = Object.keys(ST.sis).sort();
   const f = fechas.length ? fechas[fechas.length - 1] : hoy();
   UI.desde ||= f; UI.hasta ||= f;
+}
+/* Ubica un registro del sistema por su identificador (formato nuevo por contenido, o el antiguo por posición) */
+const ID_ANTIGUO = /^\d{4}-\d{2}-\d{2}\|[^|]+\|\d+$/;
+function ubicarSis(id) {
+  const p = String(id).split('|'); const f = p[0], b = p[1];
+  const items = ST.sis[f]?.secciones?.[b]?.items; if (!items) return null;
+  const idx = ID_ANTIGUO.test(id) ? +p[2] : E.idsSistema(f, b, items).indexOf(id);
+  return idx >= 0 && items[idx] ? { f, b, idx, it: items[idx] } : null;
+}
+/* Una sola vez: pasa las referencias antiguas (por posición) al formato nuevo y las guarda */
+async function migrarIds() {
+  if (ejemplo || !SB) return;
+  const nuevo = id => { if (!ID_ANTIGUO.test(id)) return id; const u = ubicarSis(id); return u ? E.idsSistema(u.f, u.b, ST.sis[u.f].secciones[u.b].items)[u.idx] : id; };
+  let n = 0;
+  try {
+    for (const l of ST.man.links) {
+      const s2 = l.s.map(nuevo);
+      if (s2.some((x, i) => x !== l.s[i])) { const { error } = await SB.from('cb_vinculos').update({ s: s2 }).eq('id', l.id); if (error) throw error; l.s = s2; n++; }
+    }
+    for (const [k, v] of Object.entries({ ...ST.man.just })) {
+      const k2 = nuevo(k); if (k2 === k) continue;
+      let r = await SB.from('cb_justificados').upsert({ item_id: k2, nota: v.nota || null, created_by: v.por || usr() }, { onConflict: 'item_id' }); if (r.error) throw r.error;
+      r = await SB.from('cb_justificados').delete().eq('item_id', k); if (r.error) throw r.error;
+      ST.man.just[k2] = v; delete ST.man.just[k]; n++;
+    }
+    for (const k of [...ST.man.noAuto]) {
+      const k2 = nuevo(k); if (k2 === k) continue;
+      let r = await SB.from('cb_noauto').upsert({ item_id: k2, created_by: usr() }, { onConflict: 'item_id' }); if (r.error) throw r.error;
+      r = await SB.from('cb_noauto').delete().eq('item_id', k); if (r.error) throw r.error;
+      ST.man.noAuto = ST.man.noAuto.map(x => x === k ? k2 : x); n++;
+    }
+    for (const c of ST.casos || []) {
+      const k2 = nuevo(c.item_id); if (k2 === c.item_id) continue;
+      const { error } = await SB.from('cb_casos').update({ item_id: k2 }).eq('id', c.id); if (error) throw error; c.item_id = k2; n++;
+    }
+  } catch (e) { toast('No se pudieron actualizar algunas referencias: ' + (e.message || e)); }
+  if (n) toast(`Se actualizaron ${n} referencias al formato nuevo`);
 }
 const feriadosEfectivos = () => [...new Set([...(ST.cfg.feriados || []), ...(ST.feriadosBase || []).map(f => f.fecha)])].sort();
 function calcular() {
@@ -1193,8 +1238,8 @@ async function cargarBitacora(mas) {
 function textoItem(id) {
   if (!id) return '';
   const p = String(id).split('|');
-  if (/^\d{4}-\d{2}-\d{2}$/.test(p[0]) && p.length === 3) { // registro del sistema
-    const it = ST.sis[p[0]]?.secciones?.[p[1]]?.items?.[+p[2]];
+  if (/^\d{4}-\d{2}-\d{2}$/.test(p[0])) { // registro del sistema
+    const it = ubicarSis(id)?.it;
     return `${bancoN(p[1])} ${fd(p[0])} · Sistema${it ? ' ' + (it.doc || '') + ' ' + fmt(it.dir === 'in' ? it.monto : -it.monto) : ''}`;
   }
   if (p.length >= 6) { const deb = +p[3] / 100, cred = +p[4] / 100; return `${bancoN(p[0])} ${fd(p[1])} · Banco ${fmt(cred > 0 ? cred : -deb)}`; }
@@ -1860,7 +1905,7 @@ document.addEventListener('click', e => {
     moverTodos: async () => {
       const r = RES[UI.banco]; const lista = r.soloSis.filter(x => (x.flags || []).some(f => f.t === 'otroBanco'));
       const porFecha = {};
-      for (const x of lista) { const [f, de, idx] = x.id.split('|'); const a = x.flags.find(f => f.t === 'otroBanco').banco; (porFecha[f] ||= []).push({ de, idx: +idx, a }); }
+      for (const x of lista) { const u = ubicarSis(x.id); if (!u) continue; const a = x.flags.find(f => f.t === 'otroBanco').banco; (porFecha[u.f] ||= []).push({ de: u.b, idx: u.idx, a }); }
       let n = 0;
       for (const [f, movs] of Object.entries(porFecha)) {
         const d = structuredClone(ST.sis[f]); movs.forEach(m => moverItem(d, m.de, m.idx, m.a));
@@ -1976,8 +2021,9 @@ document.addEventListener('click', e => {
     registrarCargo: () => { const o = gruposCargos()[+el.dataset.i]; if (o) registrarCargos([o]); },
     registrarCargos: () => registrarCargos(gruposCargos()),
     moverBanco: async () => {
-      const [f, de, idx] = el.dataset.s.split('|'); const a = el.dataset.a;
-      if (!ST.sis[f] || !ST.sis[f].secciones[de] || !ST.sis[f].secciones[de].items[+idx]) return toast('No se encontró el registro');
+      const u = ubicarSis(el.dataset.s); const a = el.dataset.a;
+      if (!u) return toast('No se encontró el registro');
+      const f = u.f, de = u.b, idx = u.idx;
       const d = structuredClone(ST.sis[f]);
       moverItem(d, de, +idx, a);
       try { await dbSis(f, d, `Movido a ${bancoN(a)}. Corríjalo también en su sistema.`); } catch (e) { return; }
