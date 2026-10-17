@@ -540,7 +540,8 @@ const BANCOS_BASE = [
   { id:'occidente', nombre:'Occidente', alias:['occidente','banco de occidente'], antes:0, despues:1, finde:false, nocturno:false, activo:true },
   { id:'banrural', nombre:'Banrural', alias:['banrural'], antes:0, despues:1, finde:false, nocturno:false, activo:true }
 ];
-const vacio = () => ({ cfg:{ bancos: structuredClone(BANCOS_BASE), feriados:[], cuentas:{} }, mov:{}, sis:{}, man:{ links:[], just:{}, noAuto:[] } });
+const CARGOS_BASE = ['TS M:', 'COMI.DB', 'COMISION', 'COMISIÓN', 'TASA DE SEGURIDAD', 'TASA SEGURIDAD', 'IMPUESTO SOBRE INTERES'];
+const vacio = () => ({ cfg:{ bancos: structuredClone(BANCOS_BASE), feriados:[], cuentas:{}, cargos: CARGOS_BASE.slice() }, mov:{}, sis:{}, man:{ links:[], just:{}, noAuto:[] } });
 let ST = vacio();
 let REAL = null;            // guarda el estado real mientras se ve el ejemplo
 let ejemplo = false;
@@ -591,7 +592,7 @@ async function cargar() {
   if (!permitido) { FASE.v = 'sinPermiso'; return; }
   const { data: cfg, error: ec } = await SB.from('cb_config').select('data').eq('id', 1).maybeSingle();
   if (ec) throw ec;
-  if (cfg && cfg.data && cfg.data.bancos) nuevo.cfg = { bancos: cfg.data.bancos, feriados: cfg.data.feriados || [], cuentas: cfg.data.cuentas || {} };
+  if (cfg && cfg.data && cfg.data.bancos) nuevo.cfg = { bancos: cfg.data.bancos, feriados: cfg.data.feriados || [], cuentas: cfg.data.cuentas || {}, cargos: cfg.data.cargos || CARGOS_BASE.slice() };
   const [sis, links, just, noauto] = await Promise.all([
     todos(() => SB.from('cb_sistema').select('fecha,secciones,avisos,texto,updated_by,updated_at').order('fecha')),
     todos(() => SB.from('cb_vinculos').select('id,s,b,nota,created_by').order('id')),
@@ -779,10 +780,12 @@ function vConciliar() {
     <div class="kpi"><div class="l">Diferencia neta</div><div class="v">${fmt(difIn - difOut)}</div><div class="s">Sistema menos banco · ingresos <span class="num">${fmt(difIn)}</span> · egresos <span class="num">${fmt(difOut)}</span></div></div>
   </div>`;
   if (r.sinEstado) h += `<div class="banner ex">No hay estado de cuenta de ${esc(bancoN(r.bancoId))} cargado. Súbalo en <b>Estados de cuenta</b> para poder cruzar.</div>`;
-  const tabs = [['pend', 'Pendientes', t.nPendS + t.nPendB], ['conc', 'Conciliados', r.matches.length], ['dias', 'Por día', r.dias.length], ['just', 'Justificados', r.justificados.length]];
+  const grupos = gruposCargos();
+  const tabs = [['pend', 'Pendientes', t.nPendS + t.nPendB], ['cargos', 'Cargos bancarios', grupos.length], ['conc', 'Conciliados', r.matches.length], ['dias', 'Por día', r.dias.length], ['just', 'Justificados', r.justificados.length]];
   h += `<div class="seg" role="tablist">${tabs.map(([k, l, n]) => `<button data-act="vista" data-k="${k}" aria-selected="${UI.vista === k}">${l}<span class="n">${n}</span></button>`).join('')}</div>`;
   if (UI.vista === 'pend') h += vPendientes(r);
   else if (UI.vista === 'conc') h += vConciliados(r);
+  else if (UI.vista === 'cargos') h += vCargos(grupos);
   else if (UI.vista === 'dias') h += vDias(r);
   else h += vJustificados(r);
   return h + `</div>`;
@@ -804,7 +807,7 @@ function itemHtml(x, lado) {
   const dirTxt = x.dir === 'in' ? 'Ingreso' : 'Egreso';
   const desc = lado === 's' ? `<b>${esc(x.doc)}</b> ${esc(x.desc)}` : esc(x.desc);
   const meta = lado === 's' ? `${fd(x.f)} · ${dirTxt}` : `${fd(x.f)} · ${dirTxt}${x.cod ? ' · ' + esc(x.cod) : ''}${x.ref ? ' · Ref ' + esc(x.ref) : ''}${x.agencia ? ' · ' + esc(x.agencia) : ''}`;
-  const fl = flagHtml(x);
+  const fl = (lado === 'b' && esCargo(x) ? '<span class="pill acc">Cargo bancario</span>' : '') + flagHtml(x);
   return `<div class="item ${sel ? 'sel' : ''}">
     <input type="checkbox" data-act="sel" data-id="${esc(x.id)}" ${sel ? 'checked' : ''} aria-label="Seleccionar">
     <div class="main"><div class="d">${desc}</div><div class="meta">${meta}</div></div>
@@ -853,6 +856,38 @@ function vConciliados(r) {
       <td><button class="btn sm ghost" data-act="deshacer" data-ids="${key}" data-tipo="${m.tipo}" data-link="${m.linkIdx ?? ''}">Separar</button></td></tr>`;
   }
   return h + `</tbody></table></div>`;
+}
+/* Cargos bancarios (comisiones, tasas) que están en el banco y no en el sistema,
+   agrupados por banco y fecha para pegarlos en el sistema como un solo movimiento. */
+function esCargo(x) {
+  if (x.dir !== 'out') return false;
+  const d = E.norm(x.desc);
+  return (ST.cfg.cargos || CARGOS_BASE).some(k => k && d.includes(E.norm(k)));
+}
+const m2 = n => (Math.round(n * 100) / 100).toFixed(2);
+function gruposCargos() {
+  const g = new Map();
+  for (const id of Object.keys(RES)) for (const x of RES[id].soloBan) {
+    if (!esCargo(x)) continue;
+    const k = id + '|' + x.f;
+    if (!g.has(k)) g.set(k, { banco: id, f: x.f, items: [], total: 0 });
+    const o = g.get(k); o.items.push(x); o.total += x.c;
+  }
+  const orden = ST.cfg.bancos.map(b => b.id);
+  return [...g.values()].map(o => ({ ...o, total: o.total / 100, desc: o.items.map(x => `${x.desc} ${m2(x.monto)}`).join(' ') }))
+    .sort((a, b) => a.f < b.f ? -1 : a.f > b.f ? 1 : orden.indexOf(a.banco) - orden.indexOf(b.banco));
+}
+const filaCargo = o => [bancoN(o.banco), fdl(o.f), o.desc, m2(o.total)].join('\t');
+function vCargos(grupos) {
+  if (!grupos.length) return `<div class="panel empty">No hay cargos bancarios pendientes de registrar en estas fechas.</div>`;
+  const total = grupos.reduce((a, o) => a + o.total, 0);
+  let h = `<div class="row" style="justify-content:space-between;align-items:center"><span class="muted small">${grupos.length} grupos · ${grupos.reduce((a, o) => a + o.items.length, 0)} cargos · total <b class="num">${fmt(total)}</b>. Todos los bancos del rango. Al registrarlos en el sistema y cargar ese reporte, se concilian solos.</span>
+    <button class="btn pri" data-act="copiarCargos">Copiar todo</button></div>
+  <div class="tw"><table><thead><tr><th>Banco</th><th>Fecha</th><th>Descripción</th><th class="r">Monto</th><th></th></tr></thead><tbody>`;
+  grupos.forEach((o, i) => {
+    h += `<tr><td><b>${esc(bancoN(o.banco))}</b></td><td>${fdl(o.f)}</td><td>${esc(o.desc)}<div class="sub">${o.items.length} cargo${o.items.length > 1 ? 's' : ''}</div></td><td class="r num">${fmt(o.total)}</td><td><button class="btn sm" data-act="copiarCargo" data-i="${i}">Copiar</button></td></tr>`;
+  });
+  return h + `</tbody></table></div><p class="muted small">Se copia en columnas: banco, fecha, descripción y monto. Las palabras que identifican un cargo se ajustan en Ajustes.</p>`;
 }
 function vDias(r) {
   let h = `<div class="tw"><table><thead><tr><th>Día</th><th class="r">Ingresos sistema</th><th class="r">Créditos banco</th><th class="r">Dif.</th><th class="r">Egresos sistema</th><th class="r">Débitos banco</th><th class="r">Dif.</th><th class="r">Pendientes</th></tr></thead><tbody>`;
@@ -1059,6 +1094,10 @@ function vAjustes() {
   }
   h += `<div class="row" style="margin-top:10px"><input type="text" id="nuevoBanco" placeholder="Nombre del banco"><button class="btn" data-act="agregarBanco">Agregar banco</button></div></div>
   <div class="grid2">
+    <div class="panel stack"><h2 style="font-size:18px">Cargos bancarios</h2>
+      <p class="muted small" style="margin:0">Un débito del banco cuya descripción contenga alguna de estas palabras se trata como cargo bancario y aparece en la lista para copiar. Una por línea.</p>
+      <textarea id="cargos" style="min-height:120px">${esc((ST.cfg.cargos || CARGOS_BASE).join('\n'))}</textarea>
+      <div class="row"><button class="btn" data-act="guardarCargos">Guardar palabras</button></div></div>
     <div class="panel stack"><h2 style="font-size:18px">Feriados</h2>
       <p class="muted small" style="margin:0">Un feriado se trata como día no hábil: lo que se registre ese día puede aparecer en el banco el siguiente día hábil. Una fecha por línea (dd/mm/aaaa).</p>
       <textarea id="feriados" style="min-height:120px">${esc(ST.cfg.feriados.map(fdl).join('\n'))}</textarea>
@@ -1216,6 +1255,12 @@ document.addEventListener('click', e => {
       if (ST.cfg.bancos.some(b => b.id === id)) return toast('Ese banco ya existe');
       ST.cfg.bancos.push({ id, nombre: n, alias: [E.norm(n)], antes: 0, despues: 1, finde: false, nocturno: false, activo: true });
       dbCfg('Banco agregado').catch(() => {}); render();
+    },
+    copiarCargos: () => { const g = gruposCargos(); copiar(g.map(filaCargo).join('\n')); },
+    copiarCargo: () => { const o = gruposCargos()[+el.dataset.i]; if (o) copiar(filaCargo(o)); },
+    guardarCargos: () => {
+      const ks = $('#cargos').value.split('\n').map(x => x.trim()).filter(Boolean);
+      ST.cfg.cargos = ks.length ? ks : CARGOS_BASE.slice(); dbCfg('Palabras de cargos guardadas').catch(() => {}); render();
     },
     guardarFeriados: () => {
       const fs = $('#feriados').value.split(/[\n,]+/).map(x => E.parseFecha(x.trim())).filter(Boolean);
