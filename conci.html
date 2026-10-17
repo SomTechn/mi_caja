@@ -1,0 +1,1274 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0e6650">
+<title>Concilia Más Pisto</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<style>
+/* Layout: herramienta de libro mayor — barra de banco/fechas arriba, resumen en 4 cifras, luego dos columnas de pendientes (sistema | banco) que se apilan en el teléfono. */
+:root{
+  --bg:#f3f5f2; --surface:#ffffff; --sunk:#e9ede8; --ink:#17201c; --muted:#5a6862; --line:#d7ded8;
+  --accent:#0e6650; --accent-soft:#dcefe7; --on-accent:#ffffff;
+  --ok:#1d7446; --ok-soft:#dff1e5; --warn:#94600a; --warn-soft:#fbefd6; --bad:#b0281f; --bad-soft:#fbe3e0;
+  --f-ui:"Figtree",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-num:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,monospace;
+  --r:10px;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#111613; --surface:#18201c; --sunk:#0d120f; --ink:#e4ebe7; --muted:#97a69f; --line:#2b3530;
+  --accent:#43c39b; --accent-soft:#183a2f; --on-accent:#08140f;
+  --ok:#55c98c; --ok-soft:#173326; --warn:#e5ab48; --warn-soft:#3a2c12; --bad:#f2786d; --bad-soft:#3d1c19; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#111613; --surface:#18201c; --sunk:#0d120f; --ink:#e4ebe7; --muted:#97a69f; --line:#2b3530;
+  --accent:#43c39b; --accent-soft:#183a2f; --on-accent:#08140f;
+  --ok:#55c98c; --ok-soft:#173326; --warn:#e5ab48; --warn-soft:#3a2c12; --bad:#f2786d; --bad-soft:#3d1c19; color-scheme:dark}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+body{background:var(--bg);color:var(--ink);font:15px/1.45 var(--f-ui);margin:0}
+.wrap{max-width:1180px;margin:0 auto;padding-inline:16px;padding-block:0 64px}
+.num{font-family:var(--f-num);font-variant-numeric:tabular-nums;white-space:nowrap}
+h1,h2,h3{margin:0;text-wrap:balance}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+header.top{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding-block:18px 10px}
+.brand{display:flex;align-items:baseline;gap:8px;margin-right:auto}
+.brand h1{font-size:22px;font-weight:700;letter-spacing:-.01em}
+.brand span{color:var(--muted);font-size:13px}
+nav.tabs{display:flex;gap:4px;background:var(--sunk);padding:4px;border-radius:999px;overflow-x:auto;max-width:100%}
+nav.tabs button{border:0;background:transparent;padding:7px 14px;border-radius:999px;cursor:pointer;font-weight:600;color:var(--muted);white-space:nowrap}
+nav.tabs button[aria-selected="true"]{background:var(--surface);color:var(--ink);box-shadow:0 1px 2px rgb(0 0 0/.12)}
+.banner{border-radius:var(--r);padding:10px 14px;margin-block:8px;font-size:14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.banner.ex{background:var(--warn-soft);color:var(--warn)}
+.banner.err{background:var(--bad-soft);color:var(--bad)}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:16px}
+.stack{display:flex;flex-direction:column;gap:14px}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:end}
+label.f{display:flex;flex-direction:column;gap:4px;font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;min-width:0}
+input[type=date],input[type=text],input[type=number],input[type=password],select,textarea{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:8px 10px;min-width:0;text-transform:none;letter-spacing:0;font-weight:400;font-size:15px}
+textarea{width:100%;min-height:150px;font-family:var(--f-num);font-size:12.5px;line-height:1.5;resize:vertical}
+.btn{border:1px solid var(--line);background:var(--surface);padding:8px 14px;border-radius:8px;cursor:pointer;font-weight:600;white-space:nowrap}
+.btn:hover{border-color:var(--muted)}
+.btn.pri{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+.btn.sm{padding:4px 9px;font-size:13px}
+.btn.ghost{border-color:transparent;background:transparent;color:var(--muted)}
+.btn.danger{color:var(--bad)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.muted{color:var(--muted)}
+.small{font-size:13px}
+/* chips de banco */
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{display:flex;align-items:center;gap:8px;border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:6px 8px 6px 14px;cursor:pointer;font-weight:600}
+.chip[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-soft)}
+.chip .badge{font-family:var(--f-num);font-size:12px;border-radius:999px;padding:1px 8px;background:var(--ok-soft);color:var(--ok)}
+.chip .badge.bad{background:var(--bad-soft);color:var(--bad)}
+.chip .badge.none{background:var(--sunk);color:var(--muted)}
+/* resumen */
+.kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.kpi{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:12px 14px;min-width:0}
+.kpi .l{font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+.kpi .v{font-family:var(--f-num);font-size:22px;font-weight:600;margin-top:2px;font-variant-numeric:tabular-nums}
+.kpi .s{font-size:13px;color:var(--muted)}
+.kpi.ok .v{color:var(--ok)} .kpi.bad .v{color:var(--bad)} .kpi.warn .v{color:var(--warn)}
+@media (max-width:760px){.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.kpi .v{font-size:18px}}
+.seg{display:flex;gap:4px;border-bottom:1px solid var(--line);overflow-x:auto}
+.seg button{border:0;background:none;padding:10px 12px;cursor:pointer;font-weight:600;color:var(--muted);border-bottom:2px solid transparent;margin-bottom:-1px;white-space:nowrap}
+.seg button[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--accent)}
+.seg .n{font-family:var(--f-num);font-size:12px;margin-left:4px}
+.cols{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px}
+@media (max-width:860px){.cols{grid-template-columns:minmax(0,1fr)}}
+.colh{display:flex;justify-content:space-between;align-items:baseline;gap:8px;padding-block:4px 8px}
+.colh h3{font-size:15px}
+.list{display:flex;flex-direction:column;border:1px solid var(--line);border-radius:var(--r);background:var(--surface);overflow:hidden}
+.item{display:grid;grid-template-columns:22px minmax(0,1fr) auto;gap:4px 10px;padding:10px 12px;border-top:1px solid var(--line);align-items:start}
+.item:first-child{border-top:0}
+.item.sel{background:var(--accent-soft)}
+.item input[type=checkbox]{margin-top:4px;width:16px;height:16px;accent-color:var(--accent)}
+.item .main{min-width:0}
+.item .d{font-size:14px;overflow-wrap:anywhere}
+.item .meta{font-size:12.5px;color:var(--muted)}
+.item .amt{text-align:right}
+.item .acts{grid-column:2/4;display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.pill{display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:600;border-radius:6px;padding:2px 7px;background:var(--sunk);color:var(--muted)}
+.pill.ok{background:var(--ok-soft);color:var(--ok)} .pill.warn{background:var(--warn-soft);color:var(--warn)} .pill.bad{background:var(--bad-soft);color:var(--bad)} .pill.acc{background:var(--accent-soft);color:var(--accent)}
+.in{color:var(--ok)} .out{color:var(--bad)}
+.empty{padding:22px 14px;text-align:center;color:var(--muted);font-size:14px}
+.tw{overflow-x:auto;border:1px solid var(--line);border-radius:var(--r);background:var(--surface)}
+table{border-collapse:collapse;width:100%;font-size:13.5px}
+th,td{padding:8px 10px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+th{font-size:11.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);font-weight:600;background:var(--sunk);position:sticky;top:0}
+td.r,th.r{text-align:right}
+tr:last-child td{border-bottom:0}
+td .sub{color:var(--muted);font-size:12px}
+.selbar{position:sticky;bottom:0;margin-top:12px;background:var(--ink);color:var(--bg);border-radius:var(--r);padding:10px 14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding-bottom:calc(10px + env(safe-area-inset-bottom,0px))}
+.selbar .btn{background:var(--bg);color:var(--ink);border-color:transparent}
+.selbar .btn.pri{background:var(--accent);color:var(--on-accent)}
+.selbar input{background:var(--bg);color:var(--ink);border:0;border-radius:8px;padding:6px 10px;flex:1;min-width:140px}
+.steps{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+@media (max-width:760px){.steps{grid-template-columns:minmax(0,1fr)}}
+.step{border:1px solid var(--line);border-radius:var(--r);padding:14px;background:var(--surface)}
+.step b{display:block;margin-bottom:4px}
+.step .k{font-family:var(--f-num);color:var(--accent);font-weight:600;font-size:13px}
+.grid2{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px}
+@media (max-width:860px){.grid2{grid-template-columns:minmax(0,1fr)}}
+.bank-cfg{display:grid;grid-template-columns:1.2fr 1.6fr .6fr .6fr auto;gap:10px;align-items:end;padding-block:12px;border-top:1px solid var(--line)}
+.bank-cfg:first-of-type{border-top:0}
+@media (max-width:860px){.bank-cfg{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}}
+.toggles{display:flex;flex-direction:column;gap:4px;font-size:13.5px}
+.toggles label{display:flex;gap:6px;align-items:center}
+.avisos{margin:0;padding-left:18px;color:var(--warn);font-size:13.5px}
+.okmsg{color:var(--ok);font-weight:600}
+.acceso{max-width:440px;margin:24px auto 0}
+.acceso input{width:100%}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(18px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:999px;font-weight:600;z-index:20;max-width:calc(100% - 32px)}
+.confirm{display:flex;gap:8px;align-items:center;flex-wrap:wrap;background:var(--bad-soft);color:var(--bad);padding:8px 10px;border-radius:8px;font-size:13.5px}
+details summary{cursor:pointer;font-weight:600}
+.secs{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px}
+.sec{border:1px solid var(--line);border-radius:var(--r);padding:12px;background:var(--surface)}
+.sec h4{margin:0 0 6px;font-size:15px}
+.kv{display:flex;justify-content:space-between;gap:8px;font-size:13.5px}
+.dates{display:flex;flex-wrap:wrap;gap:6px}
+.date-chip{border:1px solid var(--line);border-radius:8px;padding:6px 10px;background:var(--surface);cursor:pointer;font-size:13px}
+.date-chip[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-soft)}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="brand"><h1>Concilia</h1><span>Más Pisto · conciliación bancaria</span></div>
+    <nav class="tabs" role="tablist" id="tabs">
+      <button role="tab" data-tab="conciliar" aria-selected="true">Conciliar</button>
+      <button role="tab" data-tab="bancos" aria-selected="false">Estados de cuenta</button>
+      <button role="tab" data-tab="sistema" aria-selected="false">Reporte del sistema</button>
+      <button role="tab" data-tab="ajustes" aria-selected="false">Ajustes</button>
+    </nav>
+  </header>
+  <div id="banners"></div>
+  <main id="view"></main>
+</div>
+<div id="toast" class="toast" hidden></div>
+
+<script>
+/* ===== Motor de conciliación (sin dependencias de la interfaz) ===== */
+const E = (() => {
+  const DAY = 864e5;
+  const norm = s => String(s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/\s+/g, ' ').trim();
+  const MOJI = [['Ã¿', 'Ñ'], ['Ã‘', 'Ñ'], ['Ã\u0091', 'Ñ'], ['Ã±', 'ñ'], ['Ã¡', 'á'], ['Ã©', 'é'], ['Ã­', 'í'], ['Ã³', 'ó'], ['Ãº', 'ú'], ['Ã‰', 'É'], ['Ã“', 'Ó'], ['Ãš', 'Ú'], ['Ã\u0081', 'Á'], ['Ã\u008d', 'Í'], ['Ã¼', 'ü']];
+  const fixText = s => { s = String(s ?? ''); if (s.includes('Ã')) for (const [a, b] of MOJI) s = s.split(a).join(b); return s.replace(/\s+/g, ' ').trim(); };
+
+  const MESES = { enero: 1, febrero: 2, marzo: 3, abril: 4, mayo: 5, junio: 6, julio: 7, agosto: 8, septiembre: 9, setiembre: 9, octubre: 10, noviembre: 11, diciembre: 12, ene: 1, feb: 2, mar: 3, abr: 4, may: 5, jun: 6, jul: 7, ago: 8, sep: 9, sept: 9, set: 9, oct: 10, nov: 11, dic: 12 };
+  const pad = n => String(n).padStart(2, '0');
+  const iso = (y, m, d) => {
+    if (y < 100) y += 2000;
+    if (!(m >= 1 && m <= 12 && d >= 1 && d <= 31 && y > 1990 && y < 2100)) return null;
+    return `${y}-${pad(m)}-${pad(d)}`;
+  };
+  function parseFecha(v) {
+    if (v == null || v === '') return null;
+    if (v instanceof Date && !isNaN(v)) return iso(v.getFullYear(), v.getMonth() + 1, v.getDate());
+    if (typeof v === 'number') { // serial de Excel
+      if (v > 20000 && v < 80000) { const d = new Date(Math.round((v - 25569) * DAY)); return iso(d.getUTCFullYear(), d.getUTCMonth() + 1, d.getUTCDate()); }
+      return null;
+    }
+    const s = norm(v);
+    let m = s.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})\b/);
+    if (m) return iso(+m[3], +m[2], +m[1]);
+    m = s.match(/^(\d{4})[\/\-.](\d{1,2})[\/\-.](\d{1,2})\b/);
+    if (m) return iso(+m[1], +m[2], +m[3]);
+    m = s.match(/(\d{1,2})(?: de)?[ \-\/]([a-z]{3,10})\.?(?: de(?:l)?)?[ \-\/](\d{2,4})/);
+    if (m && MESES[m[2]]) return iso(+m[3], MESES[m[2]], +m[1]);
+    return null;
+  }
+  function parseMonto(v) {
+    if (v == null || v === '') return null;
+    if (typeof v === 'number') return isFinite(v) ? v : null;
+    let s = String(v).replace(/lps\.?|lempiras|hnl|\bl\.?(?=\s*[\d\-(])/gi, '').replace(/\s/g, '');
+    if (s === '-' || s === '') return 0;
+    let neg = false;
+    if (/^\(.*\)$/.test(s)) { neg = true; s = s.slice(1, -1); }
+    if (s.startsWith('-')) { neg = true; s = s.slice(1); }
+    if (s.endsWith('-')) { neg = true; s = s.slice(0, -1); }
+    if (!/^[\d,]*\.?\d+$/.test(s) && !/^[\d,]+$/.test(s)) return null;
+    const n = parseFloat(s.replace(/,/g, ''));
+    return isFinite(n) ? (neg ? -n : n) : null;
+  }
+  const cents = n => Math.round((n || 0) * 100);
+  const dn = f => Math.round(Date.UTC(+f.slice(0, 4), +f.slice(5, 7) - 1, +f.slice(8, 10)) / DAY);
+  const fromDn = d => new Date(d * DAY).toISOString().slice(0, 10);
+  const dow = d => ((d % 7) + 11) % 7; // 0 = domingo
+  const addDays = (f, k) => fromDn(dn(f) + k);
+
+  /* ---------- Reporte del sistema (pegado) ---------- */
+  function seccionDe(cells, bancos) {
+    const first = norm(cells[0]);
+    if (!first || first.length > 30) return null;
+    const rest = cells.slice(1).join(' ');
+    if (!/lps/i.test(rest) && cells.filter(c => c !== '').length > 2) return null;
+    if (first === 'caja') return { id: 'caja', nombre: 'Caja' };
+    for (const b of bancos) {
+      const names = [b.nombre, ...(b.alias || [])].map(norm).filter(Boolean);
+      if (names.includes(first)) return { id: b.id, nombre: b.nombre };
+    }
+    if (/lps/i.test(rest) && cells.filter(c => c !== '').length <= 3 && !/^(total|cierre)/.test(first)) return { id: '?' + first, nombre: cells[0], desconocido: true };
+    return null;
+  }
+  function parseSistema(texto, bancos) {
+    const lines = String(texto || '').replace(/\r/g, '').split('\n');
+    const secciones = {}; const avisos = []; let cur = null; let saldo = 0;
+    for (let raw of lines) {
+      if (!raw.trim()) continue;
+      let cells = raw.includes('\t') ? raw.split('\t') : raw.split(/\s{2,}/);
+      cells = cells.map(c => c.trim());
+      const sec = seccionDe(cells, bancos);
+      if (sec) {
+        cur = secciones[sec.id] = { id: sec.id, nombre: sec.nombre, desconocido: !!sec.desconocido, items: [], total: null, cierre: null, inicial: parseMonto(cells[cells.length - 1]) || 0 };
+        saldo = cur.inicial;
+        if (sec.desconocido) avisos.push(`La sección "${sec.nombre}" no coincide con ningún banco de Ajustes. Agregue ese nombre al banco que corresponda.`);
+        continue;
+      }
+      const h = norm(cells[0]);
+      if (!cur) continue;
+      if (h.startsWith('total del dia')) {
+        const nums = cells.slice(1).map(parseMonto).filter(n => n != null);
+        cur.total = { ing: nums[0] ?? 0, egr: nums[1] ?? 0, neto: nums[2] ?? null };
+        continue;
+      }
+      if (h.startsWith('cierre diario')) { cur.cierre = parseMonto(cells[cells.length - 1]); continue; }
+      // movimiento: doc | desc | ingreso | egreso | saldo
+      let saldoCell = null, saldoIdx = -1;
+      for (let i = cells.length - 1; i >= 1; i--) if (/lps/i.test(cells[i])) { saldoCell = parseMonto(cells[i]); saldoIdx = i; break; }
+      let ing = null, egr = null;
+      if (raw.includes('\t') && cells.length >= 4) {
+        const end = saldoIdx > 0 ? saldoIdx : cells.length;
+        ing = parseMonto(cells[end - 2]); egr = parseMonto(cells[end - 1]);
+        if (cells[end - 2] === '' || cells[end - 2] == null) ing = null;
+        if (cells[end - 1] === '' || cells[end - 1] == null) egr = null;
+      } else {
+        const nums = cells.slice(1, saldoIdx > 0 ? saldoIdx : undefined).map(parseMonto).filter(n => n != null);
+        if (nums.length) ing = nums[nums.length - 1];
+      }
+      let monto = ing || egr; if (!monto) continue;
+      let dir = ing ? 'in' : 'out';
+      if (saldoCell != null) {
+        if (Math.abs(saldo + monto - saldoCell) < 0.011) dir = 'in';
+        else if (Math.abs(saldo - monto - saldoCell) < 0.011) dir = 'out';
+        else avisos.push(`${cur.nombre}: el saldo no cuadra en "${cells[0]} ${cells[1] || ''} ${monto}".`);
+        saldo = saldoCell;
+      } else saldo += dir === 'in' ? monto : -monto;
+      const desc = fixText(cells.slice(1, Math.max(2, (saldoIdx > 0 ? saldoIdx : cells.length) - 2)).join(' ')) || fixText(cells[1]);
+      cur.items.push({ doc: cells[0], desc, monto, dir, saldo });
+    }
+    for (const s of Object.values(secciones)) {
+      const ing = s.items.filter(i => i.dir === 'in').reduce((a, i) => a + i.monto, 0);
+      const egr = s.items.filter(i => i.dir === 'out').reduce((a, i) => a + i.monto, 0);
+      s.ing = ing; s.egr = egr;
+      const ult = s.items.length ? s.items[s.items.length - 1].saldo : s.inicial;
+      s.completo = s.cierre == null || Math.abs(ult - s.cierre) < 0.011;
+      if (!s.completo) avisos.push(`${s.nombre}: el último saldo leído (${ult.toFixed(2)}) no coincide con el cierre diario (${s.cierre.toFixed(2)}). Puede que falten movimientos en lo pegado.`);
+      else if (s.total && (Math.abs(s.total.ing - ing) > 0.01 || Math.abs(s.total.egr - egr) > 0.01))
+        avisos.push(`${s.nombre}: los movimientos suman ingresos ${ing.toFixed(2)} y egresos ${egr.toFixed(2)}, y cuadran con el cierre diario, pero el "Total del día" del sistema dice ${s.total.ing.toFixed(2)} / ${s.total.egr.toFixed(2)}. El total que muestra el sistema está mal calculado.`);
+    }
+    return { secciones, avisos };
+  }
+
+  /* ---------- Estados de cuenta ---------- */
+  const KW = {
+    fecha: [/^fecha$/, /^fecha (de )?(transaccion|operacion|movimiento|contable|registro)/, /^fecha/],
+    ref: [/^referencia/, /^ref\b/, /^no\.? ?(de )?(documento|referencia|transaccion)/, /^documento/, /^n(°|o|º)\.? ?cheque/, /^cheque/],
+    cod: [/^codigo/, /^cod\b/, /^trx$/, /^tipo trx/, /^tipo$/, /^tipo (de )?(transaccion|movimiento)/],
+    desc: [/^descripcion/, /^concepto/, /^detalle/, /^transaccion/, /^movimiento$/, /^glosa/],
+    deb: [/^debitos?\b/, /^retiros?/, /^cargos?/, /^egresos?/, /^debe$/],
+    cred: [/^creditos?\b/, /^depositos?/, /^abonos?/, /^ingresos?/, /^haber$/],
+    saldo: [/^saldo/, /^balance/],
+    monto: [/^monto/, /^importe/, /^valor/],
+    agencia: [/^agencia/, /^oficina/, /^sucursal/]
+  };
+  function detectarColumnas(header) {
+    const h = header.map(norm); const cols = {}; const used = new Set();
+    for (const k of ['fecha', 'deb', 'cred', 'saldo', 'ref', 'cod', 'desc', 'monto', 'agencia']) {
+      for (const re of KW[k]) {
+        const i = h.findIndex((c, j) => c && !used.has(j) && re.test(c) && !/sistema|valor|reporte/.test(k === 'fecha' ? c : ''));
+        if (i >= 0) { cols[k] = i; used.add(i); break; }
+      }
+    }
+    return cols;
+  }
+  function detectarBanco(grid, sheetName, bancos, cuentas) {
+    let headerRow = -1, cols = {};
+    for (let r = 0; r < Math.min(grid.length, 80); r++) {
+      const c = detectarColumnas(grid[r] || []);
+      if (c.fecha != null && (c.deb != null || c.cred != null || c.monto != null)) { headerRow = r; cols = c; break; }
+    }
+    const top = grid.slice(0, Math.max(headerRow, 0) + 1).flat().filter(x => x != null).map(String);
+    const topN = norm(top.join(' | '));
+    let cuenta = null;
+    for (let r = 0; r < Math.max(headerRow, 15) && r < grid.length; r++) {
+      const row = grid[r] || [];
+      for (let c = 0; c < row.length; c++) {
+        const t = norm(row[c]).replace(/[:#\s]+$/, '');
+        if (/^(producto|cuenta|cuenta #|no\.? de cuenta|numero de cuenta|cuenta no\.?)$/.test(t)) {
+          const cand = [row[c + 1], row[c + 2], (grid[r + 1] || [])[c]].find(v => v != null && /^\d{6,}$/.test(String(v).replace(/[-\s]/g, '')));
+          if (cand) cuenta = String(cand).replace(/[-\s]/g, '');
+        }
+        const m = t.match(/cuenta[^\d]{0,12}(\d{8,})/); if (!cuenta && m) cuenta = m[1];
+      }
+    }
+    let banco = null, perfil = 'generico';
+    if (cuenta && cuentas && cuentas[cuenta]) banco = cuentas[cuenta];
+    if (/detalle de movimientos del periodo/.test(topN) && /producto/.test(topN)) perfil = 'BAC';
+    else if (/accountstatement/i.test(sheetName || '') || /titular:/.test(topN)) perfil = 'Ficohsa';
+    const sample = norm(grid.slice(headerRow + 1, headerRow + 60).map(r => (r || []).join(' ')).join(' '));
+    if (perfil === 'generico') {
+      if (/rapibac|tef de:/.test(sample)) perfil = 'BAC';
+      else if (/corresponsal tengo/.test(sample)) perfil = 'Ficohsa';
+    }
+    if (!banco && perfil !== 'generico') {
+      const b = bancos.find(b => norm(b.nombre) === norm(perfil) || (b.alias || []).map(norm).includes(norm(perfil)));
+      if (b) banco = b.id;
+    }
+    if (!banco) for (const b of bancos) if (topN.includes(norm(b.nombre))) { banco = b.id; break; }
+    return { headerRow, cols, cuenta, banco, perfil };
+  }
+  function extraerMovs(grid, map, bancoId) {
+    const { headerRow, cols } = map; const out = []; const seen = {};
+    for (let r = headerRow + 1; r < grid.length; r++) {
+      const row = grid[r] || [];
+      const f = parseFecha(row[cols.fecha]); if (!f) continue;
+      let deb = cols.deb != null ? parseMonto(row[cols.deb]) : null;
+      let cred = cols.cred != null ? parseMonto(row[cols.cred]) : null;
+      if (cols.monto != null && deb == null && cred == null) {
+        const m = parseMonto(row[cols.monto]); if (m == null) continue;
+        if (m < 0) deb = -m; else cred = m;
+      }
+      deb = Math.abs(deb || 0); cred = Math.abs(cred || 0);
+      if (!deb && !cred) continue;
+      const v = k => cols[k] != null && row[cols[k]] != null ? fixText(row[cols[k]] instanceof Date ? row[cols[k]].toISOString() : row[cols[k]]) : '';
+      const saldo = cols.saldo != null ? parseMonto(row[cols.saldo]) : null;
+      const it = { f, ref: v('ref'), cod: v('cod'), desc: v('desc'), agencia: v('agencia'), deb, cred, saldo };
+      let key = [bancoId, f, it.ref, cents(deb), cents(cred), saldo != null ? cents(saldo) : '', norm(it.desc).slice(0, 40)].join('|');
+      seen[key] = (seen[key] || 0) + 1; it.id = key + '#' + seen[key];
+      out.push(it);
+    }
+    return out;
+  }
+  function revisarSaldos(items) { // continuidad del saldo en el orden del archivo
+    const rotos = [];
+    for (let i = 1; i < items.length; i++) {
+      const a = items[i - 1], b = items[i];
+      if (a.saldo == null || b.saldo == null) continue;
+      const esp = cents(a.saldo) + cents(b.cred) - cents(b.deb);
+      if (Math.abs(esp - cents(b.saldo)) > 1) rotos.push({ despues: a, item: b, dif: (cents(b.saldo) - esp) / 100 });
+    }
+    return rotos;
+  }
+
+  /* ---------- Cruce ---------- */
+  function ventana(f, cfg, fer) {
+    const D = dn(f), finde = !!cfg.finde;
+    const habil = d => { let k = 0; while (((finde && (dow(d) === 0 || dow(d) === 6)) || fer.has(d)) && k++ < 10) d++; return d; };
+    const esp = habil(D);
+    const extra = (+cfg.despues || 0) + (cfg.nocturno ? 1 : 0);
+    const hi = extra > 0 ? habil(esp + extra) : esp;
+    return { D, esp, lo: D - (+cfg.antes || 0), hi };
+  }
+  function subset(pool, target, maxK, budget = 60000) {
+    pool = pool.filter(x => x.c <= target).sort((a, b) => b.c - a.c);
+    const suf = new Array(pool.length + 1).fill(0);
+    for (let i = pool.length - 1; i >= 0; i--) suf[i] = suf[i + 1] + pool[i].c;
+    let nodes = 0, best = null;
+    const pick = [];
+    (function dfs(i, rest) {
+      if (best || nodes++ > budget) return;
+      if (rest === 0 && pick.length >= 2) { best = pick.slice(); return; }
+      if (pick.length >= maxK || i >= pool.length || suf[i] < rest) return;
+      for (let j = i; j < pool.length && !best; j++) {
+        if (pool[j].c > rest) continue;
+        if (j > i && pool[j].c === pool[j - 1].c && !pick.includes(pool[j - 1])) continue;
+        pick.push(pool[j]); dfs(j + 1, rest - pool[j].c); pick.pop();
+      }
+    })(0, target);
+    return best;
+  }
+  const digitos = c => String(Math.abs(c)).split('').sort().join('');
+
+  function conciliar({ bancoId, cfg, feriados, sis, mov, man, desde, hasta }) {
+    const fer = new Set((feriados || []).map(dn));
+    const mDesde = dn(desde), mHasta = dn(hasta);
+    const span = (+cfg.antes || 0) + (+cfg.despues || 0) + 6;
+    const S = [], B = [];
+    for (const [f, dia] of Object.entries(sis || {})) {
+      const d = dn(f); if (d < mDesde - span || d > mHasta + span) continue;
+      const sec = dia.secciones && dia.secciones[bancoId]; if (!sec) continue;
+      sec.items.forEach((it, i) => {
+        const w = ventana(f, cfg, fer);
+        S.push({ lado: 's', id: `${f}|${bancoId}|${i}`, f, dn: d, dir: it.dir, c: cents(it.monto), monto: it.monto, doc: it.doc, desc: it.desc, w });
+      });
+    }
+    for (const it of mov || []) {
+      const d = dn(it.f); if (d < mDesde - span || d > mHasta + span) continue;
+      const dir = it.cred > 0 ? 'in' : 'out'; const monto = it.cred > 0 ? it.cred : it.deb;
+      B.push({ lado: 'b', id: it.id, f: it.f, dn: d, dir, c: cents(monto), monto, ref: it.ref, cod: it.cod, desc: it.desc, agencia: it.agencia });
+    }
+    const byId = new Map([...S, ...B].map(x => [x.id, x]));
+    const used = new Set(); const matches = [];
+    const noAuto = new Set(man.noAuto || []);
+    const add = (tipo, ss, bb, extra = {}) => {
+      ss.forEach(x => used.add(x.id)); bb.forEach(x => used.add(x.id));
+      const sumS = ss.reduce((a, x) => a + x.c, 0), sumB = bb.reduce((a, x) => a + x.c, 0);
+      const dias = ss.length && bb.length ? Math.max(...bb.map(b => b.dn)) - Math.min(...ss.map(s => s.dn)) : 0;
+      matches.push({ tipo, s: ss, b: bb, dif: (sumS - sumB) / 100, dias, ...extra });
+    };
+    // 0) vínculos manuales
+    (man.links || []).forEach((l, idx) => {
+      const ss = l.s.map(id => byId.get(id)).filter(Boolean), bb = l.b.map(id => byId.get(id)).filter(Boolean);
+      if (ss.length + bb.length === 0) return;
+      if ([...ss, ...bb].some(x => used.has(x.id))) return;
+      if (ss.length !== l.s.length || bb.length !== l.b.length) {
+        // fuera del rango cargado: solo se aplica si al menos algo está en pantalla
+      }
+      add('manual', ss, bb, { nota: l.nota || '', linkIdx: idx });
+    });
+    const libre = x => !used.has(x.id) && !noAuto.has(x.id);
+    const enVentana = (s, b) => b.dn >= s.w.lo && b.dn <= s.w.hi;
+    // 1) monto exacto dentro de la ventana de fechas
+    const idx = new Map();
+    for (const b of B) if (libre(b)) { const k = b.dir + b.c; if (!idx.has(k)) idx.set(k, []); idx.get(k).push(b); }
+    const pares = [];
+    for (const s of S) if (libre(s)) for (const b of idx.get(s.dir + s.c) || []) if (enVentana(s, b)) pares.push({ s, b, cost: Math.abs(b.dn - s.w.esp) * 10 + (b.dn < s.w.esp ? 5 : 0) });
+    pares.sort((x, y) => x.cost - y.cost || x.s.dn - y.s.dn || x.b.dn - y.b.dn);
+    for (const p of pares) if (libre(p.s) && libre(p.b)) add(p.cost === 0 ? 'exacto' : 'fecha', [p.s], [p.b]);
+    // 2) agrupados: un registro del sistema = varios del banco (p. ej. comisiones sumadas)
+    const maxK = dir => dir === 'out' ? (+cfg.maxGrupoEgr || 10) : (+cfg.maxGrupoIng || 3);
+    for (const s of S.filter(libre).sort((a, b) => b.c - a.c)) {
+      if (!libre(s)) continue;
+      // los cargos del banco (comisiones) suelen registrarse sumados días después: se buscan hasta N días atrás
+      const atras = s.dir === 'out' ? (+cfg.diasAtrasEgr || 7) : 0;
+      const pool = B.filter(b => libre(b) && b.dir === s.dir && b.dn >= s.w.lo - atras && b.dn <= s.w.hi && b.c < s.c);
+      const mismoDia = pool.filter(b => b.dn === s.w.esp || b.dn === s.dn);
+      const g = subset(mismoDia, s.c, maxK(s.dir)) || (s.dir === 'out' ? subset(pool, s.c, maxK(s.dir)) : null);
+      if (g) add('agrupado', [s], g);
+    }
+    // ... y un movimiento del banco = varios del sistema (cliente que paga dos préstamos en una transferencia)
+    for (const b of B.filter(libre).sort((a, b) => b.c - a.c)) {
+      if (!libre(b)) continue;
+      const pool = S.filter(s => libre(s) && s.dir === b.dir && enVentana(s, b) && s.c < b.c);
+      const mismoDia = pool.filter(s => s.w.esp === b.dn || s.dn === b.dn);
+      const g = subset(mismoDia, b.c, maxK(b.dir)) || (b.dir === 'out' ? subset(pool, b.c, maxK(b.dir)) : null);
+      if (g) add('agrupado', g, [b]);
+    }
+    // 3) reporte
+    const enRango = x => x.dn >= mDesde && x.dn <= mHasta;
+    const just = man.just || {};
+    const vis = matches.filter(m => [...m.s, ...m.b].some(enRango));
+    const pendS = S.filter(s => !used.has(s.id) && enRango(s));
+    const pendB = B.filter(b => !used.has(b.id) && enRango(b));
+    const soloSis = [], soloBan = [], justificados = [];
+    for (const s of pendS) (just[s.id] ? justificados : soloSis).push(s);
+    for (const b of pendB) (just[b.id] ? justificados : soloBan).push(b);
+    // pistas
+    const bLibres = B.filter(b => !used.has(b.id));
+    for (const s of soloSis) {
+      s.flags = [];
+      let best = null;
+      for (const b of bLibres) {
+        if (b.dir !== s.dir || b.dn < s.w.lo - 5 || b.dn > s.w.hi + 5) continue;
+        const d = Math.abs(b.c - s.c), rel = d / Math.max(s.c, 1);
+        if (d > 0 && (b.dn < s.w.lo - 1 || b.dn > s.w.hi + 1)) continue;
+        const transp = digitos(b.c) === digitos(s.c);
+        if (!(rel <= 0.1 || transp || (d <= 1000 && rel <= 0.25))) continue;
+        const score = rel + Math.abs(b.dn - s.w.esp) * 0.03 - (transp ? 0.2 : 0) - (d === 0 ? 0.5 : 0);
+        if (!best || score < best.score) best = { b, score, dif: (s.c - b.c) / 100, transp };
+      }
+      if (best) s.flags.push({ t: 'cerca', ...best });
+      const dup = S.filter(o => o !== s && o.f === s.f && o.c === s.c && o.dir === s.dir);
+      if (dup.length) s.flags.push({ t: 'dup', n: dup.length + 1 });
+    }
+    for (const b of soloBan) {
+      b.flags = [];
+      const dup = B.filter(o => o !== b && o.ref && o.ref === b.ref && o.c === b.c && o.dir === b.dir);
+      if (dup.length) b.flags.push({ t: 'dup', n: dup.length + 1 });
+      if (soloSis.some(s => s.flags.some(f => f.t === 'cerca' && f.b === b))) b.flags.push({ t: 'cercaRef' });
+    }
+    // resumen por día
+    const dias = {};
+    const dia = f => dias[f] || (dias[f] = { f, sIn: 0, sOut: 0, bIn: 0, bOut: 0, pendS: 0, pendB: 0 });
+    for (const s of S) if (enRango(s)) dia(s.f)[s.dir === 'in' ? 'sIn' : 'sOut'] += s.monto;
+    for (const b of B) if (enRango(b)) dia(b.f)[b.dir === 'in' ? 'bIn' : 'bOut'] += b.monto;
+    soloSis.forEach(s => dia(s.f).pendS++); soloBan.forEach(b => dia(b.f).pendB++);
+    const sum = arr => arr.reduce((a, x) => a + x.c, 0) / 100;
+    const sumDir = (arr, d) => arr.filter(x => x.dir === d).reduce((a, x) => a + x.c, 0) / 100;
+    const sR = S.filter(enRango), bR = B.filter(enRango);
+    return {
+      bancoId, matches: vis.sort((a, b) => (a.s[0] || a.b[0]).dn - (b.s[0] || b.b[0]).dn),
+      soloSis: soloSis.sort((a, b) => a.dn - b.dn || b.c - a.c), soloBan: soloBan.sort((a, b) => a.dn - b.dn || b.c - a.c), justificados,
+      dias: Object.values(dias).sort((a, b) => a.f < b.f ? -1 : 1),
+      tot: {
+        nS: sR.length, nB: bR.length, sIn: sumDir(sR, 'in'), sOut: sumDir(sR, 'out'), bIn: sumDir(bR, 'in'), bOut: sumDir(bR, 'out'),
+        conc: vis.length, pendS: sum(soloSis), pendB: sum(soloBan), nPendS: soloSis.length, nPendB: soloBan.length
+      }
+    };
+  }
+  function cruzarBancos(resultados) { // pago registrado en un banco que aparece en otro
+    const todos = Object.values(resultados);
+    for (const r of todos) for (const s of r.soloSis) {
+      for (const o of todos) {
+        if (o === r) continue;
+        const b = o.soloBan.find(b => b.dir === s.dir && b.c === s.c && Math.abs(b.dn - s.dn) <= 3);
+        if (b) { s.flags.push({ t: 'otroBanco', banco: o.bancoId, b }); break; }
+      }
+    }
+  }
+  return { norm, fixText, parseFecha, parseMonto, cents, dn, fromDn, dow, addDays, parseSistema, detectarBanco, detectarColumnas, extraerMovs, revisarSaldos, conciliar, cruzarBancos, ventana };
+})();
+if (typeof module !== 'undefined') module.exports = E;
+
+</script>
+<script>
+/* ================== Estado y almacenamiento ================== */
+const BANCOS_BASE = [
+  { id:'bac', nombre:'BAC', alias:['bac','bac credomatic'], antes:0, despues:1, finde:false, nocturno:false, activo:true },
+  { id:'ficohsa', nombre:'Ficohsa', alias:['ficohsa'], antes:0, despues:1, finde:false, nocturno:false, activo:true },
+  { id:'atlantida', nombre:'Atlántida', alias:['atlantida','banco atlantida'], antes:0, despues:1, finde:false, nocturno:false, activo:true },
+  { id:'banpais', nombre:'Banpaís', alias:['banpais'], antes:0, despues:1, finde:false, nocturno:false, activo:true },
+  { id:'occidente', nombre:'Occidente', alias:['occidente','banco de occidente'], antes:0, despues:1, finde:false, nocturno:false, activo:true },
+  { id:'banrural', nombre:'Banrural', alias:['banrural'], antes:0, despues:1, finde:false, nocturno:false, activo:true }
+];
+const vacio = () => ({ cfg:{ bancos: structuredClone(BANCOS_BASE), feriados:[], cuentas:{} }, mov:{}, sis:{}, man:{ links:[], just:{}, noAuto:[] } });
+let ST = vacio();
+let REAL = null;            // guarda el estado real mientras se ve el ejemplo
+let ejemplo = false;
+let storageOk = true;
+
+/* ---------- Conexión a Supabase (Credi0926) ---------- */
+// Escriba aquí la URL y la llave publishable (anon) del proyecto. Si las deja vacías, la app las pide la primera vez.
+const SUPABASE_URL = 'https://edmvfqelxsxevpmxgbav.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_lgTmmLtUESDDyX2sff6ArQ_z65Ti9d6';
+let SB = null, USER = null;
+const FASE = { v: 'cargando', msg: '' };
+function conexion() {
+  let u = SUPABASE_URL, k = SUPABASE_KEY;
+  try { u = u || localStorage.getItem('concilia.sbUrl') || ''; k = k || localStorage.getItem('concilia.sbKey') || ''; } catch (e) {}
+  return { u: u.trim(), k: k.trim() };
+}
+const usr = () => (USER && USER.email) || null;
+async function todos(build) {
+  const out = []; let from = 0;
+  for (;;) {
+    const { data, error } = await build().range(from, from + 999);
+    if (error) throw error;
+    out.push(...data);
+    if (data.length < 1000) break;
+    from += 1000;
+  }
+  return out;
+}
+const movDeFila = r => ({ id: r.id, f: r.f, ref: r.ref || '', cod: r.cod || '', desc: r.descripcion || '', agencia: r.agencia || '', deb: +r.deb || 0, cred: +r.cred || 0, saldo: r.saldo == null ? null : +r.saldo, orden: +r.orden || 0 });
+const ordenarMovs = arr => arr.sort((a, b) => a.f < b.f ? -1 : a.f > b.f ? 1 : (a.orden || 0) - (b.orden || 0));
+const DIAS_CARGA = 200;
+async function cargarMovs(desde, hasta) {
+  const filas = await todos(() => { let q = SB.from('cb_movimientos').select('id,banco,f,ref,cod,descripcion,agencia,deb,cred,saldo,orden').gte('f', desde); if (hasta) q = q.lt('f', hasta); return q.order('f').order('orden').order('id'); });
+  for (const r of filas) (ST.mov[r.banco] ||= []).push(movDeFila(r));
+  for (const b in ST.mov) { const vistos = new Set(); ST.mov[b] = ordenarMovs(ST.mov[b].filter(x => !vistos.has(x.id) && vistos.add(x.id))); }
+}
+async function asegurarMovs(desde) { // carga meses anteriores si el rango lo pide
+  if (ejemplo || !ST.movDesde || !desde) return;
+  const necesita = E.addDays(desde, -15);
+  if (necesita >= ST.movDesde) return;
+  toast('Cargando movimientos anteriores…');
+  try { await cargarMovs(necesita, ST.movDesde); ST.movDesde = necesita; } catch (e) { toast('No se pudieron cargar: ' + (e.message || e)); }
+}
+async function cargar() {
+  const nuevo = vacio();
+  const { data: permitido, error: ep } = await SB.rpc('cb_permitido');
+  if (ep) throw ep;
+  if (!permitido) { FASE.v = 'sinPermiso'; return; }
+  const { data: cfg, error: ec } = await SB.from('cb_config').select('data').eq('id', 1).maybeSingle();
+  if (ec) throw ec;
+  if (cfg && cfg.data && cfg.data.bancos) nuevo.cfg = { bancos: cfg.data.bancos, feriados: cfg.data.feriados || [], cuentas: cfg.data.cuentas || {} };
+  const [sis, links, just, noauto] = await Promise.all([
+    todos(() => SB.from('cb_sistema').select('fecha,secciones,avisos,texto,updated_by,updated_at').order('fecha')),
+    todos(() => SB.from('cb_vinculos').select('id,s,b,nota,created_by').order('id')),
+    todos(() => SB.from('cb_justificados').select('item_id,nota,created_by')),
+    todos(() => SB.from('cb_noauto').select('item_id'))
+  ]);
+  sis.forEach(r => nuevo.sis[r.fecha] = { secciones: r.secciones, avisos: r.avisos || [], texto: r.texto || '', por: r.updated_by, guardado: r.updated_at });
+  nuevo.man.links = links.map(r => ({ id: r.id, s: r.s || [], b: r.b || [], nota: r.nota || '', por: r.created_by }));
+  just.forEach(r => nuevo.man.just[r.item_id] = { nota: r.nota || '', por: r.created_by });
+  nuevo.man.noAuto = noauto.map(r => r.item_id);
+  ST = nuevo;
+  const ultimo = Object.keys(ST.sis).sort().pop() || hoy();
+  ST.movDesde = E.addDays(ultimo < hoy() ? ultimo : hoy(), -DIAS_CARGA);
+  await cargarMovs(ST.movDesde);
+  FASE.v = 'app';
+}
+/* Escrituras: se aplican en pantalla y se guardan en Supabase */
+function w(promesa, okMsg) {
+  if (ejemplo) { if (okMsg) toast(okMsg + ' (ejemplo, no se guarda)'); return Promise.resolve(); }
+  return Promise.resolve(promesa).then(res => { if (res && res.error) throw res.error; if (okMsg) toast(okMsg); return res; })
+    .catch(e => { storageOk = false; renderBanners(); toast('No se guardó: ' + (e.message || e)); throw e; });
+}
+const ahora = () => new Date().toISOString();
+const dbCfg = msg => w(SB && SB.from('cb_config').upsert({ id: 1, data: ST.cfg, updated_at: ahora(), updated_by: usr() }), msg);
+async function dbMovs(banco, items) {
+  if (ejemplo) return;
+  const base = Date.now() * 1000;
+  const rows = items.map((x, i) => ({ id: x.id, banco, f: x.f, ref: x.ref || null, cod: x.cod || null, descripcion: x.desc || null, agencia: x.agencia || null, deb: x.deb || 0, cred: x.cred || 0, saldo: x.saldo, orden: x.orden ?? (base + i), created_by: usr() }));
+  for (let i = 0; i < rows.length; i += 500) await w(SB.from('cb_movimientos').upsert(rows.slice(i, i + 500), { onConflict: 'id', ignoreDuplicates: true }));
+}
+const dbBorrarMovs = banco => w(SB && SB.from('cb_movimientos').delete().eq('banco', banco), 'Movimientos borrados');
+const dbSis = (fecha, d) => w(SB && SB.from('cb_sistema').upsert({ fecha, secciones: d.secciones, avisos: d.avisos, texto: d.texto, updated_at: ahora(), updated_by: usr() }), `Reporte del ${fdl(fecha)} guardado`);
+const dbBorrarSis = fecha => w(SB && SB.from('cb_sistema').delete().eq('fecha', fecha), 'Reporte borrado');
+async function dbLink(link) {
+  if (ejemplo) { link.id = 'ej' + Date.now(); toast('Vinculado (ejemplo, no se guarda)'); return; }
+  const { data } = await w(SB.from('cb_vinculos').insert({ s: link.s, b: link.b, nota: link.nota || null, created_by: usr() }).select('id').single(), 'Vinculado');
+  link.id = data.id;
+}
+const dbBorrarLink = id => w(SB && SB.from('cb_vinculos').delete().eq('id', id), 'Separado: ahora están en Pendientes');
+const dbJust = (ids, nota, msg) => w(SB && SB.from('cb_justificados').upsert(ids.map(item_id => ({ item_id, nota: nota || null, created_by: usr() })), { onConflict: 'item_id' }), msg);
+const dbDesJust = ids => w(SB && SB.from('cb_justificados').delete().in('item_id', ids));
+const dbNoAuto = ids => w(SB && SB.from('cb_noauto').upsert(ids.map(item_id => ({ item_id, created_by: usr() })), { onConflict: 'item_id', ignoreDuplicates: true }), 'Separado: ahora están en Pendientes');
+
+async function arrancar() {
+  if (!window.supabase || !window.supabase.createClient) { FASE.v = 'error'; FASE.msg = 'No se pudo cargar la conexión con Supabase. Revise el internet y recargue la página.'; return render(); }
+  const { u, k } = conexion();
+  if (!u || !k) { FASE.v = 'config'; return render(); }
+  try {
+    SB = window.supabase.createClient(u, k, { auth: { persistSession: true, autoRefreshToken: true, storageKey: 'concilia-auth' } });
+    const { data: { session } } = await SB.auth.getSession();
+    if (!session) { FASE.v = 'login'; return render(); }
+    USER = session.user;
+    FASE.v = 'cargando'; render();
+    await cargar();
+  } catch (e) {
+    FASE.v = 'error';
+    FASE.msg = /cb_|relation|does not exist|schema cache|function/i.test(e.message || '') ? 'Las tablas de conciliación no existen todavía en este proyecto. Corra el archivo cb_conciliacion.sql en el SQL Editor de Supabase.' : 'No se pudo conectar: ' + (e.message || e);
+  }
+  render();
+}
+
+/* ================== Utilidades ================== */
+const $ = (s, el = document) => el.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
+const fmt = n => (n < 0 ? '-' : '') + 'L ' + Math.abs(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const DIAS = ['dom','lun','mar','mié','jue','vie','sáb'];
+const fd = f => f ? `${DIAS[E.dow(E.dn(f))]} ${f.slice(8,10)}/${f.slice(5,7)}` : '';
+const fdl = f => f ? `${f.slice(8,10)}/${f.slice(5,7)}/${f.slice(0,4)}` : '';
+const hoy = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; };
+const bancoN = id => (ST.cfg.bancos.find(b => b.id === id) || {}).nombre || id;
+const bancosActivos = () => ST.cfg.bancos.filter(b => b.activo !== false);
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.hidden = false; clearTimeout(toast.t); toast.t = setTimeout(() => t.hidden = true, 2600); }
+let dlCap;
+async function descargar(filename, data) {
+  try {
+    if (dlCap === undefined) dlCap = window.claude?.use ? await window.claude.use('downloads') : null;
+    if (dlCap) { await dlCap.save({ filename, data }); toast('Archivo listo'); return; }
+  } catch (e) { if (e && e.code === 'declined') return; if (e && e.code !== 'unavailable') { toast('No se pudo guardar el archivo'); return; } }
+  const blob = data instanceof Blob ? data : new Blob([data]);
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = filename; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+}
+async function copiar(texto) {
+  try { await navigator.clipboard.writeText(texto); toast('Copiado. Péguelo en Excel.'); }
+  catch (e) { const ta = document.createElement('textarea'); ta.value = texto; document.body.appendChild(ta); ta.select(); try { document.execCommand('copy'); toast('Copiado. Péguelo en Excel.'); } catch (_) { toast('No se pudo copiar'); } ta.remove(); }
+}
+
+/* ================== Navegación ================== */
+const UI = { tab: 'conciliar', banco: null, desde: null, hasta: null, vista: 'pend', sel: new Set(), imp: null, sisPrev: null, sisFecha: null, sisTexto: '', verDia: null, confirm: null };
+try { const t = localStorage.getItem('concilia.tab'); if (t) UI.tab = t; } catch (e) {}
+$('#tabs').addEventListener('click', e => {
+  const b = e.target.closest('button[data-tab]'); if (!b) return;
+  UI.tab = b.dataset.tab; try { localStorage.setItem('concilia.tab', UI.tab); } catch (e) {}
+  render();
+});
+function renderBanners() {
+  let h = '';
+  if (ejemplo) h += `<div class="banner ex"><b>Está viendo datos de ejemplo</b> (nombres y montos inventados). Nada de esto se guarda.<button class="btn sm" data-act="salirEjemplo">Salir del ejemplo</button></div>`;
+  if (!storageOk) h += `<div class="banner err">Uno o más cambios no se guardaron en Supabase. Revise la conexión y recargue la página antes de seguir.</div>`;
+  $('#banners').innerHTML = h;
+}
+function vAcceso() {
+  const err = FASE.msg ? `<div class="banner err">${esc(FASE.msg)}</div>` : '';
+  if (FASE.v === 'cargando') return `<div class="panel empty">Cargando datos de conciliación…</div>`;
+  if (FASE.v === 'error') return `<div class="panel stack acceso">${err}<div class="row"><button class="btn pri" data-act="recargarTodo">Reintentar</button>${SUPABASE_URL ? '' : '<button class="btn" data-act="cambiarConexion">Cambiar conexión</button>'}${USER ? '<button class="btn ghost" data-act="salir">Cerrar sesión</button>' : ''}</div></div>`;
+  if (FASE.v === 'sinPermiso') return `<div class="panel stack acceso"><h2 style="font-size:20px">Su usuario no tiene acceso</h2><p class="muted" style="margin:0">Entró como <b>${esc(usr())}</b>, pero este correo no está autorizado para la conciliación. Pida que lo agreguen en la tabla <b>cb_usuarios</b> de Supabase.</p><div class="row"><button class="btn" data-act="recargarTodo">Ya me agregaron</button><button class="btn ghost" data-act="salir">Cerrar sesión</button></div></div>`;
+  if (FASE.v === 'config') return `<form class="panel stack acceso" id="formConfig"><h2 style="font-size:20px">Conectar con Supabase</h2><p class="muted small" style="margin:0">Se hace una sola vez en este equipo. Los datos están en Supabase → Project Settings → API.</p>${err}
+    <label class="f">URL del proyecto<input type="text" id="cfgUrl" placeholder="https://xxxxxxxx.supabase.co" autocomplete="off" required></label>
+    <label class="f">Llave publishable (anon)<input type="text" id="cfgKey" placeholder="sb_publishable_… o eyJhbGci…" autocomplete="off" required></label>
+    <div class="row"><button class="btn pri" type="submit">Conectar</button></div></form>`;
+  return `<form class="panel stack acceso" id="formLogin"><h2 style="font-size:20px">Iniciar sesión</h2><p class="muted small" style="margin:0">Use el mismo usuario del panel de Más Pisto.</p>${err}
+    <label class="f">Correo<input type="text" inputmode="email" id="logEmail" autocomplete="username" value="${esc(FASE.email || '')}" required></label>
+    <label class="f">Contraseña<input type="password" id="logPass" autocomplete="current-password" required></label>
+    <div class="row"><button class="btn pri" type="submit" id="btnLogin">Entrar</button>${SUPABASE_URL ? '' : '<button class="btn ghost" type="button" data-act="cambiarConexion">Cambiar conexión</button>'}</div></form>`;
+}
+function render() {
+  const enApp = FASE.v === 'app' || ejemplo;
+  $('#tabs').hidden = !enApp;
+  if (!enApp) { renderBanners(); $('#view').innerHTML = vAcceso(); return; }
+  document.querySelectorAll('#tabs button').forEach(b => b.setAttribute('aria-selected', b.dataset.tab === UI.tab));
+  renderBanners();
+  const v = $('#view');
+  if (UI.tab === 'conciliar') v.innerHTML = vConciliar();
+  else if (UI.tab === 'bancos') v.innerHTML = vBancos();
+  else if (UI.tab === 'sistema') v.innerHTML = vSistema();
+  else v.innerHTML = vAjustes();
+}
+
+/* ================== Conciliar ================== */
+let RES = {};
+function rangoDefecto() {
+  const fechas = Object.keys(ST.sis).sort();
+  const f = fechas.length ? fechas[fechas.length - 1] : hoy();
+  UI.desde ||= f; UI.hasta ||= f;
+}
+function calcular() {
+  rangoDefecto();
+  RES = {};
+  const desde = UI.desde <= UI.hasta ? UI.desde : UI.hasta, hasta = UI.desde <= UI.hasta ? UI.hasta : UI.desde;
+  for (const b of bancosActivos()) {
+    const tieneSis = Object.values(ST.sis).some(d => d.secciones && d.secciones[b.id] && d.secciones[b.id].items.length);
+    if (!tieneSis && !(ST.mov[b.id] || []).length) continue;
+    RES[b.id] = E.conciliar({ bancoId: b.id, cfg: b, feriados: ST.cfg.feriados, sis: ST.sis, mov: ST.mov[b.id] || [], man: ST.man, desde, hasta });
+    RES[b.id].sinEstado = !(ST.mov[b.id] || []).length;
+  }
+  E.cruzarBancos(RES);
+  const ids = Object.keys(RES);
+  if (!UI.banco || !RES[UI.banco]) UI.banco = ids.find(id => RES[id].tot.nS || RES[id].tot.nB) || ids[0] || null;
+}
+function vConciliar() {
+  const hayDatos = Object.keys(ST.sis).length || Object.keys(ST.mov).some(k => (ST.mov[k] || []).length);
+  if (!hayDatos) return vInicio();
+  calcular();
+  const r = RES[UI.banco];
+  let h = `<div class="stack">
+  <div class="panel row">
+    <label class="f">Desde<input type="date" id="desde" value="${UI.desde}"></label>
+    <label class="f">Hasta<input type="date" id="hasta" value="${UI.hasta}"></label>
+    <div class="row" style="gap:6px">
+      <button class="btn sm" data-act="rango" data-k="dia">Último día cargado</button>
+      <button class="btn sm" data-act="rango" data-k="semana">7 días</button>
+      <button class="btn sm" data-act="rango" data-k="mes">Mes</button>
+    </div>
+    <div style="margin-left:auto" class="row">
+      <button class="btn" data-act="copiarPend" ${r ? '' : 'disabled'}>Copiar pendientes</button>
+      <button class="btn pri" data-act="exportar" ${r ? '' : 'disabled'}>Exportar Excel</button>
+    </div>
+  </div>
+  <div class="chips" role="group" aria-label="Banco">`;
+  for (const b of bancosActivos()) {
+    const x = RES[b.id]; if (!x) continue;
+    const n = x.tot.nPendS + x.tot.nPendB;
+    const cls = x.sinEstado ? 'none' : n ? 'bad' : '';
+    const lbl = x.sinEstado ? 'sin estado' : n ? `${n} pend.` : (x.tot.nS || x.tot.nB) ? 'cuadra' : 'sin mov.';
+    h += `<button class="chip" data-act="banco" data-id="${b.id}" aria-pressed="${b.id === UI.banco}">${esc(b.nombre)}<span class="badge ${cls}">${lbl}</span></button>`;
+  }
+  h += `</div>`;
+  if (!r) return h + `<div class="panel empty">No hay movimientos de ningún banco en estas fechas.</div></div>`;
+  const t = r.tot;
+  const difIn = t.sIn - t.bIn, difOut = t.sOut - t.bOut;
+  h += `<div class="kpis">
+    <div class="kpi ok"><div class="l">Conciliados</div><div class="v">${t.conc}</div><div class="s">${t.nS} en sistema · ${t.nB} en banco</div></div>
+    <div class="kpi ${t.nPendS ? 'bad' : ''}"><div class="l">Solo en sistema</div><div class="v">${t.nPendS}</div><div class="s num">${fmt(t.pendS)}</div></div>
+    <div class="kpi ${t.nPendB ? 'warn' : ''}"><div class="l">Solo en banco</div><div class="v">${t.nPendB}</div><div class="s num">${fmt(t.pendB)}</div></div>
+    <div class="kpi"><div class="l">Diferencia neta</div><div class="v">${fmt(difIn - difOut)}</div><div class="s">Sistema menos banco · ingresos <span class="num">${fmt(difIn)}</span> · egresos <span class="num">${fmt(difOut)}</span></div></div>
+  </div>`;
+  if (r.sinEstado) h += `<div class="banner ex">No hay estado de cuenta de ${esc(bancoN(r.bancoId))} cargado. Súbalo en <b>Estados de cuenta</b> para poder cruzar.</div>`;
+  const tabs = [['pend', 'Pendientes', t.nPendS + t.nPendB], ['conc', 'Conciliados', r.matches.length], ['dias', 'Por día', r.dias.length], ['just', 'Justificados', r.justificados.length]];
+  h += `<div class="seg" role="tablist">${tabs.map(([k, l, n]) => `<button data-act="vista" data-k="${k}" aria-selected="${UI.vista === k}">${l}<span class="n">${n}</span></button>`).join('')}</div>`;
+  if (UI.vista === 'pend') h += vPendientes(r);
+  else if (UI.vista === 'conc') h += vConciliados(r);
+  else if (UI.vista === 'dias') h += vDias(r);
+  else h += vJustificados(r);
+  return h + `</div>`;
+}
+function flagHtml(x) {
+  return (x.flags || []).map(f => {
+    if (f.t === 'cerca') {
+      if (f.dif === 0) return `<span class="pill warn">Mismo monto en banco el ${fd(f.b.f)} (fuera de la ventana)</span><button class="btn sm" data-act="vincular1" data-s="${esc(x.id)}" data-b="${esc(f.b.id)}">Vincular</button>`;
+      return `<span class="pill warn">${f.transp ? 'Dígitos invertidos' : 'Monto parecido'}: <span class="num">${fmt(f.b.monto)}</span> en banco ${fd(f.b.f)} (dif. <span class="num">${fmt(f.dif)}</span>)</span><button class="btn sm" data-act="vincular1" data-s="${esc(x.id)}" data-b="${esc(f.b.id)}">Vincular</button>`;
+    }
+    if (f.t === 'dup') return `<span class="pill bad">Posible duplicado (${f.n} iguales el mismo día)</span>`;
+    if (f.t === 'otroBanco') return `<span class="pill bad">¿Banco equivocado? Aparece en ${esc(bancoN(f.banco))} el ${fd(f.b.f)}</span>`;
+    if (f.t === 'cercaRef') return `<span class="pill">Tiene un monto parecido en el sistema</span>`;
+    return '';
+  }).join('');
+}
+function itemHtml(x, lado) {
+  const sel = UI.sel.has(x.id);
+  const dirTxt = x.dir === 'in' ? 'Ingreso' : 'Egreso';
+  const desc = lado === 's' ? `<b>${esc(x.doc)}</b> ${esc(x.desc)}` : esc(x.desc);
+  const meta = lado === 's' ? `${fd(x.f)} · ${dirTxt}` : `${fd(x.f)} · ${dirTxt}${x.cod ? ' · ' + esc(x.cod) : ''}${x.ref ? ' · Ref ' + esc(x.ref) : ''}${x.agencia ? ' · ' + esc(x.agencia) : ''}`;
+  const fl = flagHtml(x);
+  return `<div class="item ${sel ? 'sel' : ''}">
+    <input type="checkbox" data-act="sel" data-id="${esc(x.id)}" ${sel ? 'checked' : ''} aria-label="Seleccionar">
+    <div class="main"><div class="d">${desc}</div><div class="meta">${meta}</div></div>
+    <div class="amt num ${x.dir}">${x.dir === 'out' ? '−' : ''}${fmt(x.monto).replace('L ', 'L ')}</div>
+    <div class="acts">${fl}<button class="btn sm ghost" data-act="justificar" data-id="${esc(x.id)}">Justificar</button></div>
+  </div>`;
+}
+function vPendientes(r) {
+  const col = (titulo, nota, arr, lado) => `<div><div class="colh"><h3>${titulo}</h3><span class="muted small">${nota}</span></div>
+    <div class="list">${arr.length ? arr.map(x => itemHtml(x, lado)).join('') : `<div class="empty">Nada pendiente aquí.</div>`}</div></div>`;
+  let h = `<div class="cols">
+    ${col('En el sistema, no en el banco', 'Registrado pero no llegó, o llegó con otro monto o fecha', r.soloSis, 's')}
+    ${col('En el banco, no en el sistema', 'Depósitos o cargos que nadie registró', r.soloBan, 'b')}
+  </div>`;
+  h += selBar(r);
+  return h;
+}
+function selBar(r) {
+  const all = new Map([...r.soloSis, ...r.soloBan, ...r.justificados].map(x => [x.id, x]));
+  const sel = [...UI.sel].map(id => all.get(id)).filter(Boolean);
+  if (!sel.length) return '';
+  const ss = sel.filter(x => x.lado === 's'), bb = sel.filter(x => x.lado === 'b');
+  const sig = x => x.dir === 'in' ? x.monto : -x.monto;
+  const dif = ss.reduce((a, x) => a + sig(x), 0) - bb.reduce((a, x) => a + sig(x), 0);
+  return `<div class="selbar">
+    <span><b>${ss.length}</b> del sistema · <b>${bb.length}</b> del banco · diferencia <span class="num">${fmt(dif)}</span></span>
+    <input type="text" id="notaSel" placeholder="Nota (opcional)">
+    <button class="btn pri" data-act="vincularSel" ${ss.length && bb.length ? '' : 'disabled'}>Vincular</button>
+    <button class="btn" data-act="justificarSel">Justificar</button>
+    <button class="btn" data-act="limpiarSel">Quitar selección</button>
+  </div>`;
+}
+const TIPO = { exacto: ['ok', 'Exacto'], fecha: ['acc', 'Otra fecha'], agrupado: ['warn', 'Agrupado'], manual: ['', 'Manual'] };
+function vConciliados(r) {
+  if (!r.matches.length) return `<div class="panel empty">Todavía no hay movimientos conciliados en estas fechas.</div>`;
+  let h = `<div class="tw"><table><thead><tr><th>Tipo</th><th>Sistema</th><th class="r">Monto sistema</th><th>Banco</th><th class="r">Monto banco</th><th></th></tr></thead><tbody>`;
+  for (const m of r.matches) {
+    const [cls, lbl] = TIPO[m.tipo];
+    const dias = m.tipo === 'fecha' || (m.dias && m.tipo !== 'exacto') ? ` ${m.dias > 0 ? '+' : ''}${m.dias} d` : '';
+    const sT = m.s.map(x => `<div>${fd(x.f)} · <b>${esc(x.doc)}</b> ${esc(x.desc)}</div>`).join('') || '<span class="muted">—</span>';
+    const bT = m.b.map(x => `<div>${fd(x.f)} · ${esc(x.desc)} <span class="sub">${x.ref ? 'Ref ' + esc(x.ref) : ''}</span></div>`).join('') || '<span class="muted">—</span>';
+    const sM = m.s.map(x => `<div>${fmt(x.monto)}</div>`).join(''), bM = m.b.map(x => `<div>${fmt(x.monto)}</div>`).join('');
+    const key = esc([...m.s, ...m.b].map(x => x.id).join('§'));
+    h += `<tr><td><span class="pill ${cls}">${lbl}${dias}</span>${m.dif ? `<div class="sub num">dif. ${fmt(m.dif)}</div>` : ''}${m.nota ? `<div class="sub">${esc(m.nota)}</div>` : ''}</td>
+      <td>${sT}</td><td class="r num">${sM}</td><td>${bT}</td><td class="r num">${bM}</td>
+      <td><button class="btn sm ghost" data-act="deshacer" data-ids="${key}" data-tipo="${m.tipo}" data-link="${m.linkIdx ?? ''}">Separar</button></td></tr>`;
+  }
+  return h + `</tbody></table></div>`;
+}
+function vDias(r) {
+  let h = `<div class="tw"><table><thead><tr><th>Día</th><th class="r">Ingresos sistema</th><th class="r">Créditos banco</th><th class="r">Dif.</th><th class="r">Egresos sistema</th><th class="r">Débitos banco</th><th class="r">Dif.</th><th class="r">Pendientes</th></tr></thead><tbody>`;
+  for (const d of r.dias) {
+    const di = d.sIn - d.bIn, de = d.sOut - d.bOut;
+    const c = v => Math.abs(v) < 0.005 ? 'muted' : (v > 0 ? 'out' : 'in');
+    h += `<tr><td>${fd(d.f)}</td><td class="r num">${fmt(d.sIn)}</td><td class="r num">${fmt(d.bIn)}</td><td class="r num ${c(di)}">${fmt(di)}</td><td class="r num">${fmt(d.sOut)}</td><td class="r num">${fmt(d.bOut)}</td><td class="r num ${c(de)}">${fmt(de)}</td><td class="r">${d.pendS || d.pendB ? `<span class="pill bad">${d.pendS} sis · ${d.pendB} banco</span>` : '<span class="pill ok">Cuadra</span>'}</td></tr>`;
+  }
+  h += `</tbody></table></div><p class="muted small">Las diferencias por día son normales cuando un pago se registra un día y el banco lo muestra otro. Lo que importa son los pendientes.</p>`;
+  return h;
+}
+function vJustificados(r) {
+  if (!r.justificados.length) return `<div class="panel empty">No hay movimientos justificados en estas fechas. Use “Justificar” en un pendiente que ya revisó y que no tiene pareja (por ejemplo, una comisión que se registrará en otro mes).</div>`;
+  return `<div class="list">${r.justificados.map(x => `<div class="item"><span></span><div class="main"><div class="d">${x.lado === 's' ? '<b>Sistema</b> · ' + esc(x.doc) + ' ' : '<b>Banco</b> · '}${esc(x.desc)}</div><div class="meta">${fd(x.f)} · ${esc(ST.man.just[x.id]?.nota || 'Sin nota')}</div></div><div class="amt num ${x.dir}">${fmt(x.monto)}</div><div class="acts"><button class="btn sm ghost" data-act="desjustificar" data-id="${esc(x.id)}">Devolver a pendientes</button></div></div>`).join('')}</div>`;
+}
+function vInicio() {
+  return `<div class="stack">
+  <div class="panel stack">
+    <h2 style="font-size:20px">Prepare la primera conciliación</h2>
+    <p class="muted" style="margin:0;max-width:65ch">El sistema cruza lo que registraron en el sistema contra lo que muestra cada banco, aplicando las reglas de fecha de cada banco, y le deja solo lo que no cuadra.</p>
+    <div class="steps">
+      <div class="step"><span class="k">Paso 1</span><b>Suba los estados de cuenta</b><span class="muted small">El Excel tal como lo descarga de BAC, Ficohsa, Atlántida, Banpaís… El banco se reconoce solo.</span></div>
+      <div class="step"><span class="k">Paso 2</span><b>Pegue el reporte del sistema</b><span class="muted small">Elija la fecha y pegue el reporte de ese día con todas las secciones (Caja, Bac, Ficohsa…).</span></div>
+      <div class="step"><span class="k">Paso 3</span><b>Revise los pendientes</b><span class="muted small">Lo que cruza solo queda conciliado. Usted vincula o justifica lo demás.</span></div>
+    </div>
+    <div class="row"><button class="btn pri" data-act="ir" data-tab="bancos">Subir estado de cuenta</button><button class="btn" data-act="ir" data-tab="sistema">Pegar reporte del sistema</button><button class="btn ghost" data-act="verEjemplo">Ver un ejemplo</button></div>
+  </div></div>`;
+}
+
+/* ================== Estados de cuenta ================== */
+function vBancos() {
+  let h = `<div class="stack"><div class="panel stack">
+    <h2 style="font-size:18px">Subir estado de cuenta</h2>
+    <div class="grid2">
+      <div class="stack">
+        <label class="f">Archivo Excel del banco (.xls, .xlsx, .csv)<input type="file" id="fileBanco" accept=".xls,.xlsx,.csv,.txt" multiple></label>
+        <p class="muted small" style="margin:0">Puede subir el mes completo las veces que quiera: los movimientos que ya estaban no se duplican.</p>
+      </div>
+      <div class="stack">
+        <label class="f">O pegue los movimientos copiados de la banca en línea<textarea id="pegaBanco" placeholder="Copie la tabla de movimientos (con los encabezados) y péguela aquí"></textarea></label>
+        <div class="row"><button class="btn" data-act="leerPegaBanco">Leer lo pegado</button></div>
+      </div>
+    </div>
+  </div>`;
+  if (UI.imp) h += vImport();
+  h += `<div class="panel stack"><h2 style="font-size:18px">Movimientos cargados</h2>`;
+  const filas = ST.cfg.bancos.map(b => ({ b, m: ST.mov[b.id] || [] })).filter(x => x.m.length);
+  if (!filas.length) h += `<p class="muted" style="margin:0">Aún no hay estados de cuenta cargados.</p>`;
+  else {
+    h += `<div class="tw"><table><thead><tr><th>Banco</th><th>Desde</th><th>Hasta</th><th class="r">Movimientos</th><th class="r">Créditos</th><th class="r">Débitos</th><th>Saldo</th><th></th></tr></thead><tbody>`;
+    for (const { b, m } of filas) {
+      const fs = m.map(x => x.f).sort(); const rotos = E.revisarSaldos(m);
+      h += `<tr><td><b>${esc(b.nombre)}</b></td><td>${fdl(fs[0])}</td><td>${fdl(fs[fs.length - 1])}</td><td class="r num">${m.length}</td>
+        <td class="r num">${fmt(m.reduce((a, x) => a + x.cred, 0))}</td><td class="r num">${fmt(m.reduce((a, x) => a + x.deb, 0))}</td>
+        <td>${m.some(x => x.saldo != null) ? (rotos.length ? `<span class="pill bad">${rotos.length} saltos de saldo</span>` : '<span class="pill ok">Continuo</span>') : '<span class="pill">Sin saldo</span>'}</td>
+        <td>${UI.confirm === 'mov:' + b.id ? `<span class="confirm">¿Borrar ${m.length} movimientos? <button class="btn sm danger" data-act="borrarMov" data-id="${b.id}">Sí, borrar</button><button class="btn sm" data-act="cancelConfirm">No</button></span>` : `<button class="btn sm ghost danger" data-act="confirm" data-k="mov:${b.id}">Borrar</button>`}</td></tr>`;
+    }
+    h += `</tbody></table></div><p class="muted small" style="margin:0">“Saltos de saldo” significa que entre dos movimientos el saldo no cuadra: falta una fila, o se subieron dos archivos que no se tocan.</p>`;
+  }
+  return h + `</div></div>`;
+}
+const CAMPOS = [['fecha', 'Fecha'], ['desc', 'Descripción'], ['ref', 'Referencia'], ['cod', 'Código / tipo'], ['deb', 'Débito'], ['cred', 'Crédito'], ['monto', 'Monto (+/−)'], ['saldo', 'Saldo'], ['agencia', 'Agencia']];
+function vImport() {
+  const I = UI.imp;
+  const items = E.extraerMovs(I.grid, I.map, I.banco || 'x');
+  I.items = items;
+  const fs = items.map(x => x.f).sort();
+  const header = (I.grid[I.map.headerRow] || []);
+  const ncols = Math.max(...I.grid.slice(0, 200).map(r => (r || []).length), 0);
+  const opts = sel => `<option value="">—</option>` + Array.from({ length: ncols }, (_, i) => `<option value="${i}" ${String(sel) === String(i) ? 'selected' : ''}>${esc(header[i] != null && header[i] !== '' ? header[i] : 'Columna ' + (i + 1))}</option>`).join('');
+  const rotos = E.revisarSaldos(items);
+  const existentes = new Set((ST.mov[I.banco] || []).map(x => x.id));
+  const nuevos = items.filter(x => !existentes.has(x.id.replace(/^x\|/, I.banco + '|'))).length;
+  let h = `<div class="panel stack">
+    <div class="row" style="justify-content:space-between;align-items:center"><h2 style="font-size:18px">Revisar antes de guardar · ${esc(I.nombre)}</h2><button class="btn sm ghost" data-act="cancelImp">Cancelar</button></div>
+    <div class="row">
+      <label class="f">Banco<select id="impBanco"><option value="">Elija el banco…</option>${ST.cfg.bancos.map(b => `<option value="${b.id}" ${b.id === I.banco ? 'selected' : ''}>${esc(b.nombre)}</option>`).join('')}</select></label>
+      <div class="small muted">${I.det.perfil !== 'generico' ? `Formato reconocido: <b>${esc(I.det.perfil)}</b>` : 'Formato no reconocido: revise las columnas'}${I.det.cuenta ? ` · Cuenta ${esc(I.det.cuenta)}` : ''}</div>
+    </div>
+    <div class="row small">
+      <span><b class="num">${items.length}</b> movimientos</span>
+      ${fs.length ? `<span>del <b>${fdl(fs[0])}</b> al <b>${fdl(fs[fs.length - 1])}</b></span>` : ''}
+      <span>Créditos <b class="num">${fmt(items.reduce((a, x) => a + x.cred, 0))}</b></span>
+      <span>Débitos <b class="num">${fmt(items.reduce((a, x) => a + x.deb, 0))}</b></span>
+      ${I.banco ? `<span><b class="num">${nuevos}</b> nuevos · ${items.length - nuevos} ya estaban</span>` : ''}
+      ${items.some(x => x.saldo != null) ? (rotos.length ? `<span class="pill bad">${rotos.length} saltos de saldo en el archivo</span>` : '<span class="pill ok">Saldo continuo</span>') : ''}
+    </div>
+    <details ${I.det.perfil === 'generico' || !items.length ? 'open' : ''}><summary>Columnas</summary>
+      <div class="row" style="margin-top:10px">
+        <label class="f">Fila de encabezados<input type="number" id="impHeader" min="0" value="${I.map.headerRow + 1}" style="width:90px"></label>
+        ${CAMPOS.map(([k, l]) => `<label class="f">${l}<select data-col="${k}">${opts(I.map.cols[k])}</select></label>`).join('')}
+      </div>
+    </details>
+    <div class="tw"><table><thead><tr><th>Fecha</th><th>Descripción</th><th>Ref.</th><th class="r">Débito</th><th class="r">Crédito</th><th class="r">Saldo</th></tr></thead><tbody>
+      ${items.slice(0, 6).map(x => `<tr><td>${fd(x.f)}</td><td>${esc(x.desc)}</td><td>${esc(x.ref)}</td><td class="r num">${x.deb ? fmt(x.deb) : ''}</td><td class="r num">${x.cred ? fmt(x.cred) : ''}</td><td class="r num">${x.saldo != null ? fmt(x.saldo) : ''}</td></tr>`).join('') || `<tr><td colspan="6" class="empty">No se encontraron movimientos. Revise la fila de encabezados y las columnas.</td></tr>`}
+    </tbody></table></div>
+    <div class="row"><button class="btn pri" data-act="guardarImp" ${items.length && I.banco && !I.guardando ? '' : 'disabled'}>${I.guardando ? 'Guardando…' : `Guardar ${items.length} movimientos`}</button>
+    ${!I.banco ? '<span class="muted small">Elija el banco para poder guardar.</span>' : ''}</div>
+  </div>`;
+  return h;
+}
+async function leerArchivoBanco(file) {
+  const buf = await file.arrayBuffer();
+  let wb;
+  if (/\.(csv|txt)$/i.test(file.name)) wb = XLSX.read(new TextDecoder('utf-8').decode(buf), { type: 'string', cellDates: true, raw: false });
+  else wb = XLSX.read(buf, { type: 'array', cellDates: true });
+  // elegir la hoja con más filas con fecha
+  let best = null;
+  for (const sn of wb.SheetNames) {
+    const grid = XLSX.utils.sheet_to_json(wb.Sheets[sn], { header: 1, raw: true, defval: null, blankrows: true });
+    const det = E.detectarBanco(grid, sn, ST.cfg.bancos, ST.cfg.cuentas);
+    const n = det.headerRow >= 0 ? E.extraerMovs(grid, det, 'x').length : 0;
+    if (!best || n > best.n) best = { grid, det, n, sn };
+  }
+  abrirImport(best.grid, best.det, file.name);
+}
+function abrirImport(grid, det, nombre) {
+  if (det.headerRow < 0) det.headerRow = 0;
+  UI.imp = { grid, det, map: { headerRow: det.headerRow, cols: { ...det.cols } }, banco: det.banco || '', nombre };
+  render();
+}
+async function guardarImport() {
+  const I = UI.imp; if (!I || !I.banco || I.guardando) return;
+  const banco = I.banco;
+  const items = E.extraerMovs(I.grid, I.map, banco);
+  const arr = ST.mov[banco] || [];
+  const ids = new Set(arr.map(x => x.id));
+  const base = Date.now() * 1000;
+  const nuevos = [];
+  items.forEach((it, i) => { it.orden = base + i; if (!ids.has(it.id)) { nuevos.push(it); ids.add(it.id); } });
+  I.guardando = true; render();
+  try {
+    await dbMovs(banco, nuevos);
+    if (I.det.cuenta && ST.cfg.cuentas[I.det.cuenta] !== banco) { ST.cfg.cuentas[I.det.cuenta] = banco; await dbCfg(); }
+  } catch (e) { I.guardando = false; render(); return; }
+  ST.mov[banco] = ordenarMovs(arr.concat(nuevos));
+  UI.imp = null;
+  const fs = items.map(x => x.f).sort();
+  if (fs.length && !Object.keys(ST.sis).length) { UI.desde = fs[fs.length - 1]; UI.hasta = fs[fs.length - 1]; }
+  if (fs.length && ST.movDesde && fs[0] < ST.movDesde) ST.movDesde = fs[0];
+  toast(`${bancoN(banco)}: ${nuevos.length} movimientos nuevos guardados`);
+  render();
+}
+
+/* ================== Reporte del sistema ================== */
+function vSistema() {
+  UI.sisFecha ||= (() => { const fs = Object.keys(ST.sis).sort(); return fs.length ? E.addDays(fs[fs.length - 1], 1) : hoy(); })();
+  const existe = ST.sis[UI.sisFecha];
+  let h = `<div class="stack"><div class="panel stack">
+    <h2 style="font-size:18px">Pegar reporte del sistema</h2>
+    <div class="row">
+      <label class="f">Fecha del reporte<input type="date" id="sisFecha" value="${UI.sisFecha}"></label>
+      <span class="muted small">${fd(UI.sisFecha)}${existe ? ' · <span class="pill warn">Ya hay un reporte guardado para esta fecha; si guarda, se reemplaza</span>' : ''}</span>
+    </div>
+    <label class="f">Reporte del día (todas las secciones: Caja, Bac, Ficohsa…)<textarea id="sisTexto" placeholder="Seleccione el reporte completo del día en el sistema, cópielo y péguelo aquí">${esc(UI.sisTexto)}</textarea></label>
+    <div class="row"><button class="btn" data-act="leerSis">Leer reporte</button></div>`;
+  if (UI.sisPrev) {
+    const P = UI.sisPrev;
+    const secs = Object.values(P.secciones);
+    h += `<div class="stack">`;
+    if (P.avisos.length) h += `<ul class="avisos">${P.avisos.map(a => `<li>${esc(a)}</li>`).join('')}</ul>`;
+    else h += `<div class="okmsg">Todo cuadra con los totales y cierres del sistema.</div>`;
+    h += `<div class="secs">${secs.map(s => `<div class="sec"><h4>${esc(s.nombre)}${s.id === 'caja' ? ' <span class="pill">no se concilia</span>' : s.desconocido ? ' <span class="pill bad">sin banco</span>' : ''}</h4>
+      <div class="kv"><span>Movimientos</span><span class="num">${s.items.length}</span></div>
+      <div class="kv"><span>Ingresos</span><span class="num in">${fmt(s.ing)}</span></div>
+      <div class="kv"><span>Egresos</span><span class="num out">${fmt(s.egr)}</span></div>
+      <div class="kv"><span>Cierre</span><span class="num">${s.cierre != null ? fmt(s.cierre) : '—'}</span></div></div>`).join('')}</div>
+      <div class="row"><button class="btn pri" data-act="guardarSis" ${secs.some(s => s.items.length) ? '' : 'disabled'}>Guardar reporte del ${fdl(UI.sisFecha)}</button><button class="btn ghost" data-act="cancelSis">Descartar</button></div></div>`;
+  }
+  h += `</div>`;
+  const fechas = Object.keys(ST.sis).sort().reverse();
+  h += `<div class="panel stack"><h2 style="font-size:18px">Reportes guardados</h2>`;
+  if (!fechas.length) h += `<p class="muted" style="margin:0">Aún no hay reportes guardados.</p>`;
+  else {
+    h += `<div class="dates">${fechas.map(f => `<button class="date-chip" data-act="verDia" data-f="${f}" aria-pressed="${UI.verDia === f}">${fd(f)}/${f.slice(2, 4)}</button>`).join('')}</div>`;
+    if (UI.verDia && ST.sis[UI.verDia]) {
+      const d = ST.sis[UI.verDia];
+      h += `<div class="tw"><table><thead><tr><th>Sección</th><th>Doc.</th><th>Descripción</th><th class="r">Ingreso</th><th class="r">Egreso</th></tr></thead><tbody>
+        ${Object.values(d.secciones).filter(s => s.id !== 'caja').flatMap(s => s.items.map(i => `<tr><td>${esc(s.nombre)}</td><td>${esc(i.doc)}</td><td>${esc(i.desc)}</td><td class="r num">${i.dir === 'in' ? fmt(i.monto) : ''}</td><td class="r num">${i.dir === 'out' ? fmt(i.monto) : ''}</td></tr>`)).join('') || '<tr><td colspan="5" class="empty">Sin movimientos de bancos</td></tr>'}
+      </tbody></table></div>
+      <div class="row">${UI.confirm === 'sis:' + UI.verDia ? `<span class="confirm">¿Borrar el reporte del ${fdl(UI.verDia)}? <button class="btn sm danger" data-act="borrarSis" data-f="${UI.verDia}">Sí, borrar</button><button class="btn sm" data-act="cancelConfirm">No</button></span>` : `<button class="btn sm" data-act="editarSis" data-f="${UI.verDia}">Volver a pegar este día</button><button class="btn sm ghost danger" data-act="confirm" data-k="sis:${UI.verDia}">Borrar este día</button>`}</div>`;
+    }
+  }
+  return h + `</div></div>`;
+}
+
+/* ================== Ajustes ================== */
+function vAjustes() {
+  let h = `<div class="stack"><div class="panel">
+    <h2 style="font-size:18px">Bancos y reglas de fecha</h2>
+    <p class="muted small" style="max-width:70ch">La ventana define en qué días puede aparecer en el banco un movimiento registrado en el sistema. Ejemplo: con 0 días antes y 1 después, un pago registrado el martes cruza con el banco del martes o del miércoles.</p>`;
+  for (const b of ST.cfg.bancos) {
+    h += `<div class="bank-cfg" data-bank="${b.id}">
+      <label class="f">Banco<input type="text" data-k="nombre" value="${esc(b.nombre)}"></label>
+      <label class="f">Nombres en el reporte del sistema<input type="text" data-k="alias" value="${esc((b.alias || []).join(', '))}" placeholder="bac, bac credomatic"></label>
+      <label class="f">Días antes<input type="number" min="0" max="7" data-k="antes" value="${b.antes ?? 0}"></label>
+      <label class="f">Días después<input type="number" min="0" max="7" data-k="despues" value="${b.despues ?? 1}"></label>
+      <div class="toggles">
+        <label><input type="checkbox" data-k="finde" ${b.finde ? 'checked' : ''}> Fin de semana pasa al lunes</label>
+        <label><input type="checkbox" data-k="nocturno" ${b.nocturno ? 'checked' : ''}> Depósitos nocturnos al día siguiente</label>
+        <label><input type="checkbox" data-k="activo" ${b.activo !== false ? 'checked' : ''}> Conciliar este banco</label>
+      </div>
+    </div>`;
+  }
+  h += `<div class="row" style="margin-top:10px"><input type="text" id="nuevoBanco" placeholder="Nombre del banco"><button class="btn" data-act="agregarBanco">Agregar banco</button></div></div>
+  <div class="grid2">
+    <div class="panel stack"><h2 style="font-size:18px">Feriados</h2>
+      <p class="muted small" style="margin:0">Un feriado se trata como día no hábil: lo que se registre ese día puede aparecer en el banco el siguiente día hábil. Una fecha por línea (dd/mm/aaaa).</p>
+      <textarea id="feriados" style="min-height:120px">${esc(ST.cfg.feriados.map(fdl).join('\n'))}</textarea>
+      <div class="row"><button class="btn" data-act="guardarFeriados">Guardar feriados</button></div></div>
+    <div class="panel stack"><h2 style="font-size:18px">Datos y sesión</h2>
+      <p class="muted small" style="margin:0">Los datos se guardan en Supabase y los ve cualquier usuario con acceso. El respaldo descarga una copia en JSON de lo cargado.</p>
+      <div class="row"><button class="btn" data-act="respaldo">Descargar respaldo</button><button class="btn" data-act="recargar">Recargar datos</button></div>
+      <div class="row small muted">Sesión: ${esc(usr() || '—')}<button class="btn sm" data-act="salir">Cerrar sesión</button>${SUPABASE_URL ? '' : '<button class="btn sm ghost" data-act="cambiarConexion">Cambiar conexión</button>'}</div>
+    </div>
+  </div></div>`;
+  return h;
+}
+
+/* ================== Exportar ================== */
+function filasExport(r) {
+  const b = bancoN(r.bancoId);
+  const conc = r.matches.flatMap(m => {
+    const n = Math.max(m.s.length, m.b.length);
+    return Array.from({ length: n }, (_, i) => ({ Banco: b, Tipo: TIPO[m.tipo][1], 'Fecha sistema': m.s[i] ? fdl(m.s[i].f) : '', 'Doc': m.s[i]?.doc || '', 'Descripción sistema': m.s[i]?.desc || '', 'Monto sistema': m.s[i]?.monto ?? '', 'Fecha banco': m.b[i] ? fdl(m.b[i].f) : '', 'Referencia': m.b[i]?.ref || '', 'Descripción banco': m.b[i]?.desc || '', 'Monto banco': m.b[i]?.monto ?? '', 'Dirección': (m.s[i] || m.b[i]).dir === 'in' ? 'Ingreso' : 'Egreso', 'Nota': i === 0 ? (m.nota || '') : '' }));
+  });
+  const pista = x => (x.flags || []).map(f => f.t === 'cerca' ? `Monto ${f.b.monto} en banco ${fdl(f.b.f)}` : f.t === 'dup' ? 'Posible duplicado' : f.t === 'otroBanco' ? `Aparece en ${bancoN(f.banco)}` : '').filter(Boolean).join('; ');
+  const ps = r.soloSis.map(x => ({ Banco: b, Fecha: fdl(x.f), Doc: x.doc, 'Descripción': x.desc, 'Dirección': x.dir === 'in' ? 'Ingreso' : 'Egreso', Monto: x.monto, Pista: pista(x) }));
+  const pb = r.soloBan.map(x => ({ Banco: b, Fecha: fdl(x.f), Referencia: x.ref, 'Código': x.cod, 'Descripción': x.desc, 'Dirección': x.dir === 'in' ? 'Crédito' : 'Débito', Monto: x.monto }));
+  const dias = r.dias.map(d => ({ Banco: b, Fecha: fdl(d.f), 'Ingresos sistema': d.sIn, 'Créditos banco': d.bIn, 'Dif. ingresos': +(d.sIn - d.bIn).toFixed(2), 'Egresos sistema': d.sOut, 'Débitos banco': d.bOut, 'Dif. egresos': +(d.sOut - d.bOut).toFixed(2), 'Pendientes sistema': d.pendS, 'Pendientes banco': d.pendB }));
+  const just = r.justificados.map(x => ({ Banco: b, Origen: x.lado === 's' ? 'Sistema' : 'Banco', Fecha: fdl(x.f), 'Descripción': (x.doc ? x.doc + ' ' : '') + x.desc, Monto: x.monto, Nota: ST.man.just[x.id]?.nota || '' }));
+  return { conc, ps, pb, dias, just };
+}
+function exportar() {
+  const wb = XLSX.utils.book_new();
+  const all = { conc: [], ps: [], pb: [], dias: [], just: [] }; const resumen = [];
+  for (const id of Object.keys(RES)) {
+    const r = RES[id]; const f = filasExport(r);
+    for (const k in all) all[k].push(...f[k]);
+    resumen.push({ Banco: bancoN(id), 'Ingresos sistema': r.tot.sIn, 'Créditos banco': r.tot.bIn, 'Egresos sistema': r.tot.sOut, 'Débitos banco': r.tot.bOut, Conciliados: r.tot.conc, 'Pendientes sistema': r.tot.nPendS, 'Monto pend. sistema': r.tot.pendS, 'Pendientes banco': r.tot.nPendB, 'Monto pend. banco': r.tot.pendB });
+  }
+  const add = (rows, name) => XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows.length ? rows : [{ '': 'Sin datos' }]), name);
+  add(resumen, 'Resumen'); add(all.ps, 'Solo en sistema'); add(all.pb, 'Solo en banco'); add(all.conc, 'Conciliados'); add(all.dias, 'Por día'); add(all.just, 'Justificados');
+  const out = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+  const nombre = `Conciliacion ${UI.desde}${UI.hasta !== UI.desde ? ' a ' + UI.hasta : ''}.xlsx`;
+  descargar(nombre, new Blob([out], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
+}
+function copiarPendientes() {
+  const r = RES[UI.banco]; if (!r) return;
+  const { ps, pb } = filasExport(r);
+  const lines = ['Origen\tFecha\tDescripción\tDirección\tMonto\tPista'];
+  ps.forEach(x => lines.push(['Sistema', x.Fecha, x.Doc + ' ' + x['Descripción'], x['Dirección'], x.Monto, x.Pista].join('\t')));
+  pb.forEach(x => lines.push(['Banco', x.Fecha, x['Descripción'] + (x.Referencia ? ' Ref ' + x.Referencia : ''), x['Dirección'], x.Monto, ''].join('\t')));
+  copiar(lines.join('\n'));
+}
+
+/* ================== Ejemplo (datos inventados) ================== */
+function datosEjemplo() {
+  const s = vacio();
+  const f1 = '2026-09-11', f2 = '2026-09-12', f3 = '2026-09-14';
+  const tx = (f, rows) => rows.map(([ref, cod, desc, deb, cred]) => ({ f, ref, cod, desc, deb, cred }));
+  let bac = [
+    ...tx(f1, [['500100', 'TF', 'TEF DE:MARIA JOSE EJEMPLO', 0, 1250], ['500101', 'TF', 'TEF DE:CARLOS PRUEBA LOPEZ', 0, 980], ['500102', 'TF', 'DEP.RAPIBAC 010001', 0, 2000], ['500103', 'TF', 'TEF DE:ANA DEMO REYES', 0, 1530], ['500104', 'TF', 'TEF A : 700000001', 6000, 0], ['500105', 'TS', 'TS M:6000.00F:11926', 12, 0], ['500106', 'ET', 'COMI.DB ACH 32', 25, 0]]),
+    ...tx(f2, [['500200', 'TF', 'TEF DE:LUIS FICTICIO MEJIA', 0, 1100], ['500201', 'TF', 'TEF DE:ROSA MODELO CRUZ', 0, 3000], ['500202', 'D5', 'DEPOSITO JUAN EJEMPLO', 0, 845]]),
+    ...tx(f3, [['500300', 'TF', 'TEF DE:PEDRO MUESTRA PAZ', 0, 1500], ['500301', 'TF', 'TEF DE:SOFIA PRUEBA DIAZ', 0, 2200]])
+  ];
+  let saldo = 100000; bac.forEach((x, i) => { saldo += x.cred - x.deb; x.saldo = +saldo.toFixed(2); x.agencia = ''; x.id = `bac|${x.f}|${x.ref}|${i}#1`; });
+  s.mov.bac = bac;
+  let fic = [...tx(f1, [['', '', 'Deposito en Corresponsal TENGO', 0, 700], ['', '', 'Transferencia entre Cuentas-KAREN EJEMPLO ZELAYA', 0, 1800], ['', '', 'Tasa de Seguridad Poblacional', 18, 0]]), ...tx(f3, [['', '', 'Deposito en Corresponsal TENGO', 0, 950], ['', '', 'Deposito en Corresponsal TENGO', 0, 1205]])];
+  saldo = 50000; fic.forEach((x, i) => { saldo += x.cred - x.deb; x.saldo = +saldo.toFixed(2); x.agencia = ''; x.id = `ficohsa|${x.f}|${i}#1`; });
+  s.mov.ficohsa = fic;
+  const P = (f, txt) => { s.sis[f] = { ...E.parseSistema(txt, s.cfg.bancos), guardado: Date.now() }; };
+  const L = (doc, desc, ing, egr) => [doc, desc, ing ? ing.toLocaleString('en-US', { minimumFractionDigits: 2 }) : '', egr ? egr.toLocaleString('en-US', { minimumFractionDigits: 2 }) : ''];
+  const sec = (nombre, rows) => { let sal = 0; const out = [`${nombre}\t\tLps. 0.00`]; rows.forEach(r => { sal += (parseFloat(String(r[2]).replace(/,/g, '')) || 0) - (parseFloat(String(r[3]).replace(/,/g, '')) || 0); out.push([...r, 'Lps. ' + sal.toLocaleString('en-US', { minimumFractionDigits: 2 })].join('\t')); }); out.push(`Cierre diario\tLps. ${sal.toFixed(2)}`); return out.join('\n'); };
+  P(f1, [sec('Bac', [L('PP', 'Pago a préstamo', 1250), L('PP', 'Pago a préstamo', 980), L('PP', 'Pago a préstamo', 2000), L('PP', 'Pago a préstamo', 1350), L('TFB', 'Traslado de fondos entre BAC a CAJA, Préstamo aprobado (Cliente Ejemplo)', 0, 6000), L('PP', 'Pago a préstamo', 1800)]), sec('Ficohsa', [L('PP', 'Pago a préstamo', 700)])].join('\n'));
+  P(f2, [sec('Bac', [L('PP', 'Pago a préstamo', 1100), L('PP', 'Pago a préstamo', 3000), L('PP', 'Pago a préstamo', 1500), L('GB', 'COMI.DB ACH 32 25.00 TS 12.00', 0, 37)]), sec('Ficohsa', [L('PP', 'Pago a préstamo', 950), L('PP', 'Pago a préstamo', 1205)])].join('\n'));
+  return s;
+}
+
+/* ================== Eventos ================== */
+document.addEventListener('click', e => {
+  const el = e.target.closest('[data-act]'); if (!el) return;
+  const a = el.dataset.act;
+  if (a === 'sel') return; // lo maneja change
+  const A = {
+    ir: () => { UI.tab = el.dataset.tab; render(); },
+    banco: () => { UI.banco = el.dataset.id; UI.sel.clear(); render(); },
+    vista: () => { UI.vista = el.dataset.k; render(); },
+    rango: () => {
+      const fs = Object.keys(ST.sis).sort(); const last = fs.length ? fs[fs.length - 1] : hoy();
+      if (el.dataset.k === 'dia') { UI.desde = UI.hasta = last; }
+      else if (el.dataset.k === 'semana') { UI.hasta = last; UI.desde = E.addDays(last, -6); }
+      else { UI.hasta = last; UI.desde = last.slice(0, 8) + '01'; }
+      UI.sel.clear(); render(); asegurarMovs(UI.desde).then(render);
+    },
+    exportar, copiarPend: copiarPendientes,
+    vincular1: async () => { const l = { s: [el.dataset.s], b: [el.dataset.b], nota: '' }; try { await dbLink(l); } catch (e) { return; } ST.man.links.push(l); render(); },
+    vincularSel: async () => {
+      const r = RES[UI.banco]; const all = new Map([...r.soloSis, ...r.soloBan, ...r.justificados].map(x => [x.id, x]));
+      const sel = [...UI.sel].map(id => all.get(id)).filter(Boolean);
+      const nota = ($('#notaSel') || {}).value || '';
+      const l = { s: sel.filter(x => x.lado === 's').map(x => x.id), b: sel.filter(x => x.lado === 'b').map(x => x.id), nota };
+      const yaJust = sel.filter(x => ST.man.just[x.id]).map(x => x.id);
+      try { await dbLink(l); if (yaJust.length) await dbDesJust(yaJust); } catch (e) { return; }
+      yaJust.forEach(id => delete ST.man.just[id]);
+      ST.man.links.push(l); UI.sel.clear(); render();
+    },
+    justificar: async () => { const id = el.dataset.id; try { await dbJust([id], '', 'Movido a Justificados'); } catch (e) { return; } ST.man.just[id] = { nota: '', por: usr() }; UI.sel.delete(id); render(); },
+    justificarSel: async () => { const nota = ($('#notaSel') || {}).value || ''; const ids = [...UI.sel]; try { await dbJust(ids, nota, 'Movidos a Justificados'); } catch (e) { return; } ids.forEach(id => ST.man.just[id] = { nota, por: usr() }); UI.sel.clear(); render(); },
+    desjustificar: async () => { const id = el.dataset.id; try { await dbDesJust([id]); } catch (e) { return; } delete ST.man.just[id]; render(); },
+    limpiarSel: () => { UI.sel.clear(); render(); },
+    deshacer: async () => {
+      const ids = el.dataset.ids.split('§');
+      try {
+        if (el.dataset.tipo === 'manual' && el.dataset.link !== '') {
+          const idx = +el.dataset.link, l = ST.man.links[idx];
+          await dbBorrarLink(l.id); ST.man.links.splice(idx, 1);
+        } else {
+          const nuevos = ids.filter(id => !ST.man.noAuto.includes(id));
+          await dbNoAuto(nuevos); ST.man.noAuto.push(...nuevos);
+        }
+      } catch (e) { return; }
+      render();
+    },
+    leerPegaBanco: () => {
+      const t = $('#pegaBanco').value; if (!t.trim()) return toast('Pegue primero los movimientos');
+      const grid = t.replace(/\r/g, '').split('\n').filter(l => l.trim()).map(l => l.includes('\t') ? l.split('\t') : l.split(/\s{2,}|;/));
+      const det = E.detectarBanco(grid, '', ST.cfg.bancos, ST.cfg.cuentas);
+      if (det.headerRow < 0) { det.headerRow = -1; det.cols = { fecha: 0, desc: 1, cred: 2 }; }
+      UI.imp = { grid, det, map: { headerRow: det.headerRow, cols: { ...det.cols } }, banco: det.banco || '', nombre: 'Movimientos pegados' };
+      render();
+    },
+    cancelImp: () => { UI.imp = null; render(); },
+    guardarImp: guardarImport,
+    leerSis: () => {
+      UI.sisTexto = $('#sisTexto').value; UI.sisFecha = $('#sisFecha').value || UI.sisFecha;
+      if (!UI.sisTexto.trim()) return toast('Pegue primero el reporte');
+      UI.sisPrev = E.parseSistema(UI.sisTexto, ST.cfg.bancos); render();
+    },
+    guardarSis: async () => {
+      const f = $('#sisFecha').value || UI.sisFecha;
+      const d = { secciones: UI.sisPrev.secciones, avisos: UI.sisPrev.avisos, texto: UI.sisTexto, por: usr(), guardado: ahora() };
+      try { await dbSis(f, d); } catch (e) { return; }
+      ST.sis[f] = d; UI.sisPrev = null; UI.sisTexto = ''; UI.verDia = f; UI.sisFecha = E.addDays(f, 1);
+      UI.desde = UI.hasta = f; render();
+    },
+    cancelSis: () => { UI.sisPrev = null; render(); },
+    verDia: () => { UI.verDia = UI.verDia === el.dataset.f ? null : el.dataset.f; UI.confirm = null; render(); },
+    editarSis: () => { const f = el.dataset.f; UI.sisFecha = f; UI.sisTexto = ST.sis[f].texto || ''; UI.sisPrev = null; render(); window.scrollTo({ top: 0 }); },
+    confirm: () => { UI.confirm = el.dataset.k; render(); },
+    cancelConfirm: () => { UI.confirm = null; render(); },
+    borrarMov: async () => { const b = el.dataset.id; try { await dbBorrarMovs(b); } catch (e) { return; } delete ST.mov[b]; UI.confirm = null; render(); },
+    borrarSis: async () => { const f = el.dataset.f; try { await dbBorrarSis(f); } catch (e) { return; } delete ST.sis[f]; UI.confirm = null; UI.verDia = null; render(); },
+    recargarTodo: () => { FASE.msg = ''; arrancar(); },
+    recargar: async () => { FASE.v = 'cargando'; render(); try { await cargar(); } catch (e) { FASE.v = 'error'; FASE.msg = 'No se pudo cargar: ' + (e.message || e); } render(); },
+    salir: async () => { try { await SB.auth.signOut(); } catch (e) {} USER = null; ST = vacio(); FASE.v = 'login'; render(); },
+    cambiarConexion: () => { try { localStorage.removeItem('concilia.sbUrl'); localStorage.removeItem('concilia.sbKey'); } catch (e) {} FASE.v = 'config'; render(); },
+    agregarBanco: () => {
+      const n = $('#nuevoBanco').value.trim(); if (!n) return;
+      const id = E.norm(n).replace(/[^a-z0-9]+/g, '') || 'banco' + Date.now();
+      if (ST.cfg.bancos.some(b => b.id === id)) return toast('Ese banco ya existe');
+      ST.cfg.bancos.push({ id, nombre: n, alias: [E.norm(n)], antes: 0, despues: 1, finde: false, nocturno: false, activo: true });
+      dbCfg('Banco agregado').catch(() => {}); render();
+    },
+    guardarFeriados: () => {
+      const fs = $('#feriados').value.split(/[\n,]+/).map(x => E.parseFecha(x.trim())).filter(Boolean);
+      ST.cfg.feriados = [...new Set(fs)].sort(); dbCfg(`${ST.cfg.feriados.length} feriados guardados`).catch(() => {}); render();
+    },
+    respaldo: () => descargar(`Concilia respaldo ${hoy()}.json`, JSON.stringify(ST)),
+    verEjemplo: () => { REAL = ST; ST = datosEjemplo(); ejemplo = true; UI.desde = '2026-09-11'; UI.hasta = '2026-09-14'; UI.banco = 'bac'; UI.tab = 'conciliar'; render(); },
+    salirEjemplo: () => { ST = REAL || vacio(); REAL = null; ejemplo = false; UI.desde = UI.hasta = null; UI.banco = null; UI.sel.clear(); render(); }
+  };
+  if (A[a]) A[a]();
+});
+document.addEventListener('change', async e => {
+  const t = e.target;
+  if (t.dataset.act === 'sel') { t.checked ? UI.sel.add(t.dataset.id) : UI.sel.delete(t.dataset.id); render(); return; }
+  if (t.id === 'desde' || t.id === 'hasta') { UI[t.id] = t.value; UI.sel.clear(); render(); if (t.id === 'desde') { await asegurarMovs(t.value); render(); } return; }
+  if (t.id === 'fileBanco') { for (const f of t.files) { try { await leerArchivoBanco(f); } catch (err) { toast('No se pudo leer ' + f.name); } break; } t.value = ''; return; }
+  if (t.id === 'impBanco') { UI.imp.banco = t.value; render(); return; }
+  if (t.id === 'impHeader') { UI.imp.map.headerRow = Math.max(0, (+t.value || 1) - 1); UI.imp.map.cols = E.detectarColumnas(UI.imp.grid[UI.imp.map.headerRow] || []); render(); return; }
+  if (t.dataset.col) { const v = t.value; if (v === '') delete UI.imp.map.cols[t.dataset.col]; else UI.imp.map.cols[t.dataset.col] = +v; render(); return; }
+  if (t.id === 'sisFecha') { UI.sisFecha = t.value; UI.sisTexto = ($('#sisTexto') || {}).value || UI.sisTexto; render(); return; }
+  const bc = t.closest('.bank-cfg');
+  if (bc) {
+    const b = ST.cfg.bancos.find(x => x.id === bc.dataset.bank); const k = t.dataset.k;
+    if (k === 'alias') b.alias = t.value.split(',').map(x => E.norm(x)).filter(Boolean);
+    else if (t.type === 'checkbox') b[k] = t.checked;
+    else if (t.type === 'number') b[k] = Math.max(0, +t.value || 0);
+    else b[k] = t.value;
+    dbCfg('Ajuste guardado').catch(() => {});
+  }
+});
+document.addEventListener('input', e => { if (e.target.id === 'sisTexto') UI.sisTexto = e.target.value; });
+
+document.addEventListener('submit', async e => {
+  e.preventDefault();
+  const f = e.target;
+  if (f.id === 'formConfig') {
+    const u = $('#cfgUrl').value.trim().replace(/\/+$/, ''), k = $('#cfgKey').value.trim();
+    if (!/^https:\/\/.+/.test(u) || k.length < 20) { FASE.msg = 'Revise la URL (empieza con https://) y la llave.'; return render(); }
+    try { localStorage.setItem('concilia.sbUrl', u); localStorage.setItem('concilia.sbKey', k); } catch (err) {}
+    FASE.msg = ''; arrancar();
+  }
+  if (f.id === 'formLogin') {
+    const btn = $('#btnLogin'); btn.disabled = true; btn.textContent = 'Entrando…'; FASE.email = $('#logEmail').value.trim();
+    const { data, error } = await SB.auth.signInWithPassword({ email: $('#logEmail').value.trim(), password: $('#logPass').value });
+    if (error) { FASE.msg = /invalid/i.test(error.message) ? 'Correo o contraseña incorrectos.' : error.message; return render(); }
+    USER = data.user; FASE.msg = ''; FASE.v = 'cargando'; render();
+    try { await cargar(); } catch (err) { FASE.v = 'error'; FASE.msg = /cb_|relation|does not exist|schema cache|function/i.test(err.message || '') ? 'Las tablas de conciliación no existen todavía en este proyecto. Corra el archivo cb_conciliacion.sql en el SQL Editor de Supabase.' : 'No se pudo cargar: ' + (err.message || err); }
+    render();
+  }
+});
+
+render(); arrancar();
+</script>
+
+</body>
+</html>

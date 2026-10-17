@@ -1,7 +1,7 @@
 /* Service Worker — Flujo de Caja (Más Pisto)
    Cachea el "shell" de la app para abrir sin conexión.
    Sube la versión (CACHE) cada vez que cambie index.html para forzar actualización. */
-var CACHE = "caja-shell-v10";
+var CACHE = "caja-shell-v11";
 var SHELL = [
   "./",
   "./index.html",
@@ -42,15 +42,19 @@ self.addEventListener("fetch", function(e){
   var url = new URL(req.url);
   var esMismoOrigen = (url.origin === self.location.origin);
 
-  // Navegación (abrir la app): network-first, con fallback al index cacheado
+  // Navegación (abrir la app): network-first, con fallback a la copia cacheada.
+  // Solo la caja (raíz o index.html) se guarda como index.html; otras páginas del repo
+  // (por ejemplo conci.html) se guardan con su propio nombre para no reemplazar la caja.
   if(req.mode === "navigate"){
+    var esIndex = esMismoOrigen && /\/(index\.html)?$/.test(url.pathname);
     e.respondWith(
       fetch(req).then(function(resp){
         var copia = resp.clone();
-        caches.open(CACHE).then(function(c){ c.put("./index.html", copia); });
+        caches.open(CACHE).then(function(c){ c.put(esIndex ? "./index.html" : req, copia); });
         return resp;
       }).catch(function(){
-        return caches.match("./index.html").then(function(m){ return m || caches.match("./"); });
+        if(esIndex) return caches.match("./index.html").then(function(m){ return m || caches.match("./"); });
+        return caches.match(req, { ignoreSearch: true });
       })
     );
     return;
