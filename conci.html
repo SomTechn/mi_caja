@@ -624,7 +624,7 @@ async function dbMovs(banco, items) {
   for (let i = 0; i < rows.length; i += 500) await w(SB.from('cb_movimientos').upsert(rows.slice(i, i + 500), { onConflict: 'id', ignoreDuplicates: true }));
 }
 const dbBorrarMovs = banco => w(SB && SB.from('cb_movimientos').delete().eq('banco', banco), 'Movimientos borrados');
-const dbSis = (fecha, d) => w(SB && SB.from('cb_sistema').upsert({ fecha, secciones: d.secciones, avisos: d.avisos, texto: d.texto, updated_at: ahora(), updated_by: usr() }), `Reporte del ${fdl(fecha)} guardado`);
+const dbSis = (fecha, d, msg) => w(SB && SB.from('cb_sistema').upsert({ fecha, secciones: d.secciones, avisos: d.avisos || [], texto: d.texto || '', updated_at: ahora(), updated_by: usr() }), msg === undefined ? `Reporte del ${fdl(fecha)} guardado` : msg);
 const dbBorrarSis = fecha => w(SB && SB.from('cb_sistema').delete().eq('fecha', fecha), 'Reporte borrado');
 async function dbLink(link) {
   if (ejemplo) { link.id = 'ej' + Date.now(); toast('Vinculado (ejemplo, no se guarda)'); return; }
@@ -878,14 +878,48 @@ function gruposCargos() {
     .sort((a, b) => a.f < b.f ? -1 : a.f > b.f ? 1 : orden.indexOf(a.banco) - orden.indexOf(b.banco));
 }
 const filaCargo = o => [bancoN(o.banco), fdl(o.f), o.desc, m2(o.total)].join('\t');
+/* Agrega los grupos marcados como registrados a los registros del sistema de su fecha */
+async function registrarCargos(gs) {
+  if (!gs.length) return;
+  const porFecha = {};
+  for (const o of gs) (porFecha[o.f] ||= []).push(o);
+  let n = 0;
+  for (const [f, lista] of Object.entries(porFecha)) {
+    const d = structuredClone(ST.sis[f] || { secciones: {}, avisos: [], texto: '' });
+    for (const o of lista) {
+      const sec = d.secciones[o.banco] ||= { id: o.banco, nombre: bancoN(o.banco), items: [], ing: 0, egr: 0, total: null, cierre: null, inicial: 0 };
+      sec.items.push({ doc: 'GB', desc: o.desc, monto: o.total, dir: 'out', agregado: true, por: usr(), ts: ahora() });
+      sec.egr = (sec.egr || 0) + o.total;
+    }
+    try { await dbSis(f, d, ''); } catch (e) { break; }
+    ST.sis[f] = { ...d, por: usr(), guardado: ahora() }; n += lista.length;
+  }
+  if (n) toast(n === 1 ? 'Agregado a los registros del sistema' : `${n} grupos agregados a los registros del sistema`);
+  render();
+}
+/* Al volver a pegar un día, conserva lo agregado desde aquí si el reporte no lo trae ya */
+function conservarAgregados(viejo, nuevo) {
+  if (!viejo || !viejo.secciones) return;
+  for (const [bid, sec] of Object.entries(viejo.secciones)) {
+    const ag = (sec.items || []).filter(i => i.agregado);
+    if (!ag.length) continue;
+    const dest = nuevo.secciones[bid] ||= { id: bid, nombre: sec.nombre, items: [], ing: 0, egr: 0, total: null, cierre: null, inicial: 0 };
+    const usados = new Set();
+    for (const a of ag) {
+      const i = dest.items.findIndex((x, k) => !usados.has(k) && !x.agregado && x.dir === a.dir && E.cents(x.monto) === E.cents(a.monto));
+      if (i >= 0) { usados.add(i); continue; } // el reporte ya lo trae
+      dest.items.push(a); dest.egr = (dest.egr || 0) + a.monto;
+    }
+  }
+}
 function vCargos(grupos) {
   if (!grupos.length) return `<div class="panel empty">No hay cargos bancarios pendientes de registrar en estas fechas.</div>`;
   const total = grupos.reduce((a, o) => a + o.total, 0);
-  let h = `<div class="row" style="justify-content:space-between;align-items:center"><span class="muted small">${grupos.length} grupos · ${grupos.reduce((a, o) => a + o.items.length, 0)} cargos · total <b class="num">${fmt(total)}</b>. Todos los bancos del rango. Al registrarlos en el sistema y cargar ese reporte, se concilian solos.</span>
-    <button class="btn pri" data-act="copiarCargos">Copiar todo</button></div>
+  let h = `<div class="row" style="justify-content:space-between;align-items:center"><span class="muted small">${grupos.length} grupos · ${grupos.reduce((a, o) => a + o.items.length, 0)} cargos · total <b class="num">${fmt(total)}</b>. Todos los bancos del rango. Cópielos, regístrelos en el sistema y márquelos como registrados: se agregan a los registros del sistema de esa fecha y se concilian.</span>
+    <div class="row"><button class="btn" data-act="copiarCargos">Copiar todo</button><button class="btn pri" data-act="registrarCargos">Marcar todos como registrados</button></div></div>
   <div class="tw"><table><thead><tr><th>Banco</th><th>Fecha</th><th>Descripción</th><th class="r">Monto</th><th></th></tr></thead><tbody>`;
   grupos.forEach((o, i) => {
-    h += `<tr><td><b>${esc(bancoN(o.banco))}</b></td><td>${fdl(o.f)}</td><td>${esc(o.desc)}<div class="sub">${o.items.length} cargo${o.items.length > 1 ? 's' : ''}</div></td><td class="r num">${fmt(o.total)}</td><td><button class="btn sm" data-act="copiarCargo" data-i="${i}">Copiar</button></td></tr>`;
+    h += `<tr><td><b>${esc(bancoN(o.banco))}</b></td><td>${fdl(o.f)}</td><td>${esc(o.desc)}<div class="sub">${o.items.length} cargo${o.items.length > 1 ? 's' : ''}</div></td><td class="r num">${fmt(o.total)}</td><td><div class="row" style="gap:6px;flex-wrap:nowrap"><button class="btn sm" data-act="copiarCargo" data-i="${i}">Copiar</button><button class="btn sm" data-act="registrarCargo" data-i="${i}">Marcar registrado</button></div></td></tr>`;
   });
   return h + `</tbody></table></div><p class="muted small">Se copia en columnas: banco, fecha, descripción y monto. Las palabras que identifican un cargo se ajustan en Ajustes.</p>`;
 }
@@ -1066,7 +1100,7 @@ function vSistema() {
     if (UI.verDia && ST.sis[UI.verDia]) {
       const d = ST.sis[UI.verDia];
       h += `<div class="tw"><table><thead><tr><th>Sección</th><th>Doc.</th><th>Descripción</th><th class="r">Ingreso</th><th class="r">Egreso</th></tr></thead><tbody>
-        ${Object.values(d.secciones).filter(s => s.id !== 'caja').flatMap(s => s.items.map(i => `<tr><td>${esc(s.nombre)}</td><td>${esc(i.doc)}</td><td>${esc(i.desc)}</td><td class="r num">${i.dir === 'in' ? fmt(i.monto) : ''}</td><td class="r num">${i.dir === 'out' ? fmt(i.monto) : ''}</td></tr>`)).join('') || '<tr><td colspan="5" class="empty">Sin movimientos de bancos</td></tr>'}
+        ${Object.values(d.secciones).filter(s => s.id !== 'caja').flatMap(s => s.items.map((i, k) => `<tr><td>${esc(s.nombre)}</td><td>${esc(i.doc)}</td><td>${esc(i.desc)}${i.agregado ? `<div class="row" style="gap:6px;margin-top:4px"><span class="pill acc">Marcado como registrado desde Concilia</span><button class="btn sm ghost danger" data-act="quitarAgregado" data-f="${UI.verDia}" data-b="${esc(s.id)}" data-i="${k}">Quitar</button></div>` : ''}</td><td class="r num">${i.dir === 'in' ? fmt(i.monto) : ''}</td><td class="r num">${i.dir === 'out' ? fmt(i.monto) : ''}</td></tr>`)).join('') || '<tr><td colspan="5" class="empty">Sin movimientos de bancos</td></tr>'}
       </tbody></table></div>
       <div class="row">${UI.confirm === 'sis:' + UI.verDia ? `<span class="confirm">¿Borrar el reporte del ${fdl(UI.verDia)}? <button class="btn sm danger" data-act="borrarSis" data-f="${UI.verDia}">Sí, borrar</button><button class="btn sm" data-act="cancelConfirm">No</button></span>` : `<button class="btn sm" data-act="editarSis" data-f="${UI.verDia}">Volver a pegar este día</button><button class="btn sm ghost danger" data-act="confirm" data-k="sis:${UI.verDia}">Borrar este día</button>`}</div>`;
     }
@@ -1233,7 +1267,8 @@ document.addEventListener('click', e => {
     },
     guardarSis: async () => {
       const f = $('#sisFecha').value || UI.sisFecha;
-      const d = { secciones: UI.sisPrev.secciones, avisos: UI.sisPrev.avisos, texto: UI.sisTexto, por: usr(), guardado: ahora() };
+      const d = { secciones: structuredClone(UI.sisPrev.secciones), avisos: UI.sisPrev.avisos, texto: UI.sisTexto, por: usr(), guardado: ahora() };
+      conservarAgregados(ST.sis[f], d);
       try { await dbSis(f, d); } catch (e) { return; }
       ST.sis[f] = d; UI.sisPrev = null; UI.sisTexto = ''; UI.verDia = f; UI.sisFecha = E.addDays(f, 1);
       UI.desde = UI.hasta = f; render();
@@ -1257,6 +1292,16 @@ document.addEventListener('click', e => {
       dbCfg('Banco agregado').catch(() => {}); render();
     },
     copiarCargos: () => { const g = gruposCargos(); copiar(g.map(filaCargo).join('\n')); },
+    registrarCargo: () => { const o = gruposCargos()[+el.dataset.i]; if (o) registrarCargos([o]); },
+    registrarCargos: () => registrarCargos(gruposCargos()),
+    quitarAgregado: async () => {
+      const f = el.dataset.f, bid = el.dataset.b, i = +el.dataset.i;
+      const d = structuredClone(ST.sis[f]); const sec = d.secciones[bid]; const it = sec.items[i];
+      if (!it || !it.agregado) return;
+      sec.items.splice(i, 1); sec.egr = (sec.egr || 0) - it.monto;
+      try { await dbSis(f, d, 'Quitado de los registros del sistema'); } catch (e) { return; }
+      ST.sis[f] = { ...ST.sis[f], secciones: d.secciones }; render();
+    },
     copiarCargo: () => { const o = gruposCargos()[+el.dataset.i]; if (o) copiar(filaCargo(o)); },
     guardarCargos: () => {
       const ks = $('#cargos').value.split('\n').map(x => x.trim()).filter(Boolean);
