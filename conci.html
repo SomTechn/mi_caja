@@ -124,6 +124,9 @@ td .sub{color:var(--muted);font-size:12px}
 .avisos{margin:0;padding-left:18px;color:var(--warn);font-size:13.5px}
 .okmsg{color:var(--ok);font-weight:600}
 .banco-h td{background:var(--accent-soft)}
+.justform{display:flex;gap:6px;flex-wrap:wrap;width:100%}
+.justform input{flex:1;min-width:180px}
+.nota-just{font-size:13.5px;margin-top:4px;padding:6px 8px;background:var(--sunk);border-radius:6px;overflow-wrap:anywhere}
 .cierre-in{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px}
 .cierre-in input{width:100%}
 @media (max-width:560px){.cierre-in{grid-template-columns:minmax(0,1fr)}}
@@ -711,7 +714,7 @@ async function copiar(texto) {
 }
 
 /* ================== Navegación ================== */
-const UI = { cierreIn: {}, verCierre: null, rD: null, rH: null, tab: 'conciliar', banco: null, desde: null, hasta: null, vista: 'pend', sel: new Set(), imp: null, sisPrev: null, sisFecha: null, sisTexto: '', verDia: null, confirm: null };
+const UI = { justAbierto: null, cierreIn: {}, verCierre: null, rD: null, rH: null, tab: 'conciliar', banco: null, desde: null, hasta: null, vista: 'pend', sel: new Set(), imp: null, sisPrev: null, sisFecha: null, sisTexto: '', verDia: null, confirm: null };
 try { const t = localStorage.getItem('concilia.tab'); if (t) UI.tab = t; } catch (e) {}
 $('#tabs').addEventListener('click', e => {
   const b = e.target.closest('button[data-tab]'); if (!b) return;
@@ -1010,7 +1013,7 @@ function itemHtml(x, lado) {
     <input type="checkbox" data-act="sel" data-id="${esc(x.id)}" ${sel ? 'checked' : ''} aria-label="Seleccionar">
     <div class="main"><div class="d">${desc}</div><div class="meta">${meta}</div></div>
     <div class="amt num ${x.dir}">${x.dir === 'out' ? '−' : ''}${fmt(x.monto).replace('L ', 'L ')}</div>
-    <div class="acts">${fl}<button class="btn sm ghost" data-act="justificar" data-id="${esc(x.id)}">Justificar</button></div>
+    <div class="acts">${UI.justAbierto === x.id ? formJust(x.id, '') : `${fl}<button class="btn sm ghost" data-act="justificar" data-id="${esc(x.id)}">Justificar</button>`}</div>
   </div>`;
 }
 function vPendientes(r) {
@@ -1131,9 +1134,13 @@ function vDias(r) {
   h += `</tbody></table></div><p class="muted small">Las diferencias por día son normales cuando un pago se registra un día y el banco lo muestra otro. Lo que importa son los pendientes.</p>`;
   return h;
 }
+function formJust(id, nota) {
+  return `<div class="justform"><input type="text" id="justNota" value="${esc(nota || '')}" placeholder="Motivo: por qué está bien aunque no tenga pareja" maxlength="300">
+    <button class="btn sm pri" data-act="confirmarJust" data-id="${esc(id)}">Guardar</button><button class="btn sm" data-act="cancelarJust">Cancelar</button></div>`;
+}
 function vJustificados(r) {
   if (!r.justificados.length) return `<div class="panel empty">No hay movimientos justificados en estas fechas. Use “Justificar” en un pendiente que ya revisó y que no tiene pareja (por ejemplo, una comisión que se registrará en otro mes).</div>`;
-  return `<div class="list">${r.justificados.map(x => `<div class="item"><span></span><div class="main"><div class="d">${x.lado === 's' ? '<b>Sistema</b> · ' + esc(x.doc) + ' ' : '<b>Banco</b> · '}${esc(x.desc)}</div><div class="meta">${fd(x.f)} · ${esc(ST.man.just[x.id]?.nota || 'Sin nota')}</div></div><div class="amt num ${x.dir}">${fmt(x.monto)}</div><div class="acts"><button class="btn sm ghost" data-act="desjustificar" data-id="${esc(x.id)}">Devolver a pendientes</button></div></div>`).join('')}</div>`;
+  return `<div class="list">${r.justificados.map(x => `<div class="item"><span></span><div class="main"><div class="d">${x.lado === 's' ? '<b>Sistema</b> · ' + esc(x.doc) + ' ' : '<b>Banco</b> · '}${esc(x.desc)}</div><div class="meta">${fd(x.f)}${ST.man.just[x.id]?.por ? ' · por ' + esc(ST.man.just[x.id].por) : ''}</div><div class="nota-just">${ST.man.just[x.id]?.nota ? esc(ST.man.just[x.id].nota) : '<span class="muted">Sin nota</span>'}</div></div><div class="amt num ${x.dir}">${fmt(x.monto)}</div><div class="acts">${UI.justAbierto === x.id ? formJust(x.id, ST.man.just[x.id]?.nota) : `<button class="btn sm" data-act="justificar" data-id="${esc(x.id)}">${ST.man.just[x.id]?.nota ? 'Editar nota' : 'Agregar nota'}</button><button class="btn sm ghost" data-act="desjustificar" data-id="${esc(x.id)}">Devolver a pendientes</button>`}</div></div>`).join('')}</div>`;
 }
 function vInicio() {
   return `<div class="stack">
@@ -1454,7 +1461,13 @@ document.addEventListener('click', e => {
       yaJust.forEach(id => delete ST.man.just[id]);
       ST.man.links.push(l); UI.sel.clear(); render();
     },
-    justificar: async () => { const id = el.dataset.id; try { await dbJust([id], '', 'Movido a Justificados'); } catch (e) { return; } ST.man.just[id] = { nota: '', por: usr() }; UI.sel.delete(id); render(); },
+    justificar: () => { UI.justAbierto = el.dataset.id; render(); const i = $('#justNota'); if (i) i.focus(); },
+    cancelarJust: () => { UI.justAbierto = null; render(); },
+    confirmarJust: async () => {
+      const id = el.dataset.id, nota = (($('#justNota') || {}).value || '').trim(), yaEstaba = !!ST.man.just[id];
+      try { await dbJust([id], nota, yaEstaba ? 'Nota guardada' : 'Movido a Justificados'); } catch (e) { return; }
+      ST.man.just[id] = { nota, por: usr() }; UI.sel.delete(id); UI.justAbierto = null; render();
+    },
     justificarSel: async () => { const nota = ($('#notaSel') || {}).value || ''; const ids = [...UI.sel]; try { await dbJust(ids, nota, 'Movidos a Justificados'); } catch (e) { return; } ids.forEach(id => ST.man.just[id] = { nota, por: usr() }); UI.sel.clear(); render(); },
     desjustificar: async () => { const id = el.dataset.id; try { await dbDesJust([id]); } catch (e) { return; } delete ST.man.just[id]; render(); },
     limpiarSel: () => { UI.sel.clear(); render(); },
@@ -1560,6 +1573,10 @@ document.addEventListener('change', async e => {
     else b[k] = t.value;
     dbCfg('Ajuste guardado').catch(() => {});
   }
+});
+document.addEventListener('keydown', e => {
+  if (e.target.id === 'justNota' && e.key === 'Enter') { e.preventDefault(); const b = document.querySelector('[data-act=confirmarJust]'); if (b) b.click(); }
+  if (e.target.id === 'justNota' && e.key === 'Escape') { UI.justAbierto = null; render(); }
 });
 document.addEventListener('input', e => { if (e.target.id === 'sisTexto') UI.sisTexto = e.target.value; });
 
