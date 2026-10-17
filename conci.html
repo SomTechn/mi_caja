@@ -124,6 +124,12 @@ td .sub{color:var(--muted);font-size:12px}
 .avisos{margin:0;padding-left:18px;color:var(--warn);font-size:13.5px}
 .okmsg{color:var(--ok);font-weight:600}
 .banco-h td{background:var(--accent-soft)}
+.cierre-in{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px}
+.cierre-in input{width:100%}
+@media (max-width:560px){.cierre-in{grid-template-columns:minmax(0,1fr)}}
+table.estado td{font-size:14.5px}
+table.estado tr.tot td{font-weight:700;background:var(--sunk)}
+table.estado tr.ok td{color:var(--ok)} table.estado tr.bad td{color:var(--bad)}
 .acceso{max-width:440px;margin:24px auto 0}
 .acceso input{width:100%}
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(18px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:999px;font-weight:600;z-index:20;max-width:calc(100% - 32px)}
@@ -148,6 +154,7 @@ details summary{cursor:pointer;font-weight:600}
       <button role="tab" data-tab="conciliar" aria-selected="true">Conciliar</button>
       <button role="tab" data-tab="bancos" aria-selected="false">Estados de cuenta</button>
       <button role="tab" data-tab="sistema" aria-selected="false">Reporte del sistema</button>
+      <button role="tab" data-tab="historial" aria-selected="false">Historial</button>
       <button role="tab" data-tab="ajustes" aria-selected="false">Ajustes</button>
     </nav>
   </header>
@@ -556,7 +563,7 @@ const BANCOS_BASE = [
   { id:'banrural', nombre:'Banrural', alias:['banrural'], antes:0, despues:1, finde:false, nocturno:false, activo:true }
 ];
 const CARGOS_BASE = E.CARGOS_BASE;
-const vacio = () => ({ cfg:{ bancos: structuredClone(BANCOS_BASE), feriados:[], cuentas:{}, cargos: CARGOS_BASE.slice() }, mov:{}, sis:{}, man:{ links:[], just:{}, noAuto:[] } });
+const vacio = () => ({ cfg:{ bancos: structuredClone(BANCOS_BASE), feriados:[], cuentas:{}, cargos: CARGOS_BASE.slice() }, mov:{}, sis:{}, man:{ links:[], just:{}, noAuto:[] }, cierres: [] });
 let ST = vacio();
 let REAL = null;            // guarda el estado real mientras se ve el ejemplo
 let ejemplo = false;
@@ -608,12 +615,14 @@ async function cargar() {
   const { data: cfg, error: ec } = await SB.from('cb_config').select('data').eq('id', 1).maybeSingle();
   if (ec) throw ec;
   if (cfg && cfg.data && cfg.data.bancos) nuevo.cfg = { bancos: cfg.data.bancos, feriados: cfg.data.feriados || [], cuentas: cfg.data.cuentas || {}, cargos: cfg.data.cargos || CARGOS_BASE.slice() };
-  const [sis, links, just, noauto] = await Promise.all([
+  const [sis, links, just, noauto, cierres] = await Promise.all([
     todos(() => SB.from('cb_sistema').select('fecha,secciones,avisos,texto,updated_by,updated_at').order('fecha')),
     todos(() => SB.from('cb_vinculos').select('id,s,b,nota,created_by').order('id')),
     todos(() => SB.from('cb_justificados').select('item_id,nota,created_by')),
-    todos(() => SB.from('cb_noauto').select('item_id'))
+    todos(() => SB.from('cb_noauto').select('item_id')),
+    todos(() => SB.from('cb_cierres').select('id,banco,desde,hasta,datos,diferencia,nota,created_at,created_by').order('desde'))
   ]);
+  nuevo.cierres = cierres;
   sis.forEach(r => nuevo.sis[r.fecha] = { secciones: r.secciones, avisos: r.avisos || [], texto: r.texto || '', por: r.updated_by, guardado: r.updated_at });
   nuevo.man.links = links.map(r => ({ id: r.id, s: r.s || [], b: r.b || [], nota: r.nota || '', por: r.created_by }));
   just.forEach(r => nuevo.man.just[r.item_id] = { nota: r.nota || '', por: r.created_by });
@@ -649,6 +658,12 @@ async function dbLink(link) {
 const dbBorrarLink = id => w(SB && SB.from('cb_vinculos').delete().eq('id', id), 'Separado: ahora están en Pendientes');
 const dbJust = (ids, nota, msg) => w(SB && SB.from('cb_justificados').upsert(ids.map(item_id => ({ item_id, nota: nota || null, created_by: usr() })), { onConflict: 'item_id' }), msg);
 const dbDesJust = ids => w(SB && SB.from('cb_justificados').delete().in('item_id', ids));
+async function dbCierre(row) {
+  if (ejemplo) { toast('Cierre guardado (ejemplo, no se guarda)'); return { ...row, id: 'ej' + Date.now(), created_at: ahora(), created_by: usr() }; }
+  const { data } = await w(SB.from('cb_cierres').upsert({ ...row, created_at: ahora(), created_by: usr() }, { onConflict: 'banco,desde,hasta' }).select('id,banco,desde,hasta,datos,diferencia,nota,created_at,created_by').single(), 'Cierre guardado');
+  return data;
+}
+const dbBorrarCierre = id => w(SB && SB.from('cb_cierres').delete().eq('id', id), 'Cierre borrado');
 const dbNoAuto = ids => w(SB && SB.from('cb_noauto').upsert(ids.map(item_id => ({ item_id, created_by: usr() })), { onConflict: 'item_id', ignoreDuplicates: true }), 'Separado: ahora están en Pendientes');
 
 async function arrancar() {
@@ -696,7 +711,7 @@ async function copiar(texto) {
 }
 
 /* ================== Navegación ================== */
-const UI = { tab: 'conciliar', banco: null, desde: null, hasta: null, vista: 'pend', sel: new Set(), imp: null, sisPrev: null, sisFecha: null, sisTexto: '', verDia: null, confirm: null };
+const UI = { cierreIn: {}, verCierre: null, rD: null, rH: null, tab: 'conciliar', banco: null, desde: null, hasta: null, vista: 'pend', sel: new Set(), imp: null, sisPrev: null, sisFecha: null, sisTexto: '', verDia: null, confirm: null };
 try { const t = localStorage.getItem('concilia.tab'); if (t) UI.tab = t; } catch (e) {}
 $('#tabs').addEventListener('click', e => {
   const b = e.target.closest('button[data-tab]'); if (!b) return;
@@ -733,6 +748,7 @@ function render() {
   if (UI.tab === 'conciliar') v.innerHTML = vConciliar();
   else if (UI.tab === 'bancos') v.innerHTML = vBancos();
   else if (UI.tab === 'sistema') v.innerHTML = vSistema();
+  else if (UI.tab === 'historial') v.innerHTML = vHistorial();
   else v.innerHTML = vAjustes();
 }
 
@@ -747,6 +763,7 @@ function calcular() {
   rangoDefecto();
   RES = {};
   const desde = UI.desde <= UI.hasta ? UI.desde : UI.hasta, hasta = UI.desde <= UI.hasta ? UI.hasta : UI.desde;
+  UI.rD = desde; UI.rH = hasta;
   for (const b of bancosActivos()) {
     const tieneSis = Object.values(ST.sis).some(d => d.secciones && d.secciones[b.id] && d.secciones[b.id].items.length);
     if (!tieneSis && !(ST.mov[b.id] || []).length) continue;
@@ -768,6 +785,156 @@ function mesContable(f) {
 }
 const mesContableActivo = () => { if (!UI.desde || !UI.hasta) return false; const m = mesContable(UI.desde); return m.desde === UI.desde && m.hasta === UI.hasta; };
 const nombreMesContable = f => `${MESES_N[+f.slice(5, 7) - 1][0].toUpperCase() + MESES_N[+f.slice(5, 7) - 1].slice(1)} ${f.slice(0, 4)} · 09/${f.slice(5, 7)} al 08/${mesContable(f).hasta.slice(5, 7)}`;
+/* ================== Cierre y saldos ================== */
+const num = v => { if (v == null || String(v).trim() === '') return null; const n = E.parseMonto(v); return n == null ? null : n; };
+const sgn = x => x.dir === 'in' ? x.monto : -x.monto;
+const r2 = n => Math.round(n * 100) / 100;
+const claveCierre = bid => `${bid}|${UI.rD}|${UI.rH}`;
+function cierreGuardado(bid, desde, hasta) { return (ST.cierres || []).find(c => c.banco === bid && c.desde === desde && c.hasta === hasta); }
+function datosCierre(bid) {
+  const r = RES[bid]; if (!r) return null;
+  const desde = UI.rD, hasta = UI.rH;
+  const movs = ST.mov[bid] || [];
+  const conSaldo = movs.filter(x => x.saldo != null);
+  let bIniAuto = null;
+  const previos = conSaldo.filter(x => x.f < desde);
+  if (previos.length) bIniAuto = previos[previos.length - 1].saldo;
+  else { const p = conSaldo.find(x => x.f >= desde && x.f <= hasta); if (p) bIniAuto = r2(p.saldo - p.cred + p.deb); }
+  const hastaFin = conSaldo.filter(x => x.f <= hasta);
+  const bFinAuto = hastaFin.length ? hastaFin[hastaFin.length - 1].saldo : null;
+  const enR = movs.filter(x => x.f >= desde && x.f <= hasta);
+  const netoB = r2(enR.reduce((a, x) => a + x.cred - x.deb, 0));
+  const ultimoBanco = movs.length ? movs[movs.length - 1].f : null;
+  const prev = (ST.cierres || []).filter(c => c.banco === bid && c.hasta < desde).sort((a, b) => a.hasta < b.hasta ? 1 : -1)[0];
+  const guardado = cierreGuardado(bid, desde, hasta);
+  const I = UI.cierreIn[claveCierre(bid)] || (guardado ? { bancoIni: guardado.datos.bancoIniIn, bancoFin: guardado.datos.bancoFinIn, librosIni: guardado.datos.librosIniIn, librosFin: guardado.datos.librosFinIn, nota: guardado.nota } : {});
+  const bancoIni = num(I.bancoIni) ?? bIniAuto ?? 0;
+  const bancoFin = num(I.bancoFin) ?? bFinAuto ?? 0;
+  const prevContiguo = prev && prev.hasta === E.addDays(desde, -1);
+  const librosIniDef = prevContiguo ? +prev.datos.librosFin : null;
+  const librosIni = num(I.librosIni) ?? librosIniDef ?? bancoIni;
+  const supuestoIni = num(I.librosIni) == null && librosIniDef == null;
+  const netoS = r2(r.tot.sIn - r.tot.sOut);
+  const librosCalc = r2(librosIni + netoS);
+  const librosFin = num(I.librosFin) ?? librosCalc;
+  const enRango = x => x.f >= desde && x.f <= hasta;
+  const pendS = [...r.soloSis, ...r.justificados.filter(x => x.lado === 's')];
+  const pendB = [...r.soloBan, ...r.justificados.filter(x => x.lado === 'b')];
+  const sum = (arr, d) => r2(arr.filter(x => x.dir === d).reduce((a, x) => a + x.monto, 0));
+  const A = sum(pendS, 'in'), B = sum(pendS, 'out'), C = sum(pendB, 'in'), D = sum(pendB, 'out');
+  const M = r2(r.matches.reduce((a, m) => a + m.s.filter(enRango).reduce((t, x) => t + sgn(x), 0) - m.b.filter(enRango).reduce((t, x) => t + sgn(x), 0), 0));
+  const Iv = r2(librosIni - bancoIni);
+  const Eesp = r2(bancoFin + A - B - C + D + M + Iv);
+  const resid = r2(librosFin - Eesp);
+  const checkBanco = r2(bancoIni + netoB - bancoFin);
+  return { bid, desde, hasta, I, bIniAuto, bFinAuto, bancoIni, bancoFin, librosIni, librosIniDef, supuestoIni, librosCalc, librosFin, netoS, netoB,
+    A, B, C, D, M, Iv, E: Eesp, resid, checkBanco, ultimoBanco, pendS, pendB, guardado, prev, conciliados: r.matches.length };
+}
+function filaMonto(l, v, cls = '', extra = '') { return `<tr class="${cls}"><td>${l}${extra}</td><td class="r num">${fmt(v)}</td></tr>`; }
+function vCierre(r) {
+  const c = datosCierre(r.bancoId); if (!c) return '';
+  const ok = Math.abs(c.resid) < 0.005;
+  const inp = (k, val, ph) => `<input type="text" inputmode="decimal" data-cierre="${k}" value="${esc(val ?? '')}" placeholder="${esc(ph)}">`;
+  const nombre = mesContableActivo() ? nombreMesContable(c.desde) : `${fdl(c.desde)} al ${fdl(c.hasta)}`;
+  let h = `<div class="stack">
+  <div class="row" style="justify-content:space-between;align-items:center">
+    <div><h3 style="font-size:17px">${esc(bancoN(c.bid))} · ${esc(nombre)}</h3>
+    <div class="small muted">${c.guardado ? `Cierre guardado el ${fdl(String(c.guardado.created_at).slice(0, 10))}${c.guardado.created_by ? ' por ' + esc(c.guardado.created_by) : ''}` : 'Sin cierre guardado para este período'}</div></div>
+    ${(() => { const faltan = c.supuestoIni || num(c.I.librosFin) == null;
+      if (!ok) return `<span class="pill bad" style="font-size:14px;padding:6px 12px">Diferencia sin explicar ${fmt(c.resid)}</span>`;
+      if (faltan) return `<span class="pill warn" style="font-size:14px;padding:6px 12px">Falta escribir el saldo ${c.supuestoIni ? 'inicial' : 'final'} del sistema</span>`;
+      return `<span class="pill ok" style="font-size:14px;padding:6px 12px">Cuadra</span>`; })()}
+  </div>
+  <div class="grid2">
+    <div class="panel stack"><h3 style="font-size:15px">Saldos</h3>
+      <div class="cierre-in">
+        <label class="f">Banco · saldo inicial${inp('bancoIni', c.I.bancoIni, c.bIniAuto != null ? E.parseMonto(c.bIniAuto).toFixed(2) + ' (del estado de cuenta)' : 'Escriba el saldo')}</label>
+        <label class="f">Banco · saldo final${inp('bancoFin', c.I.bancoFin, c.bFinAuto != null ? c.bFinAuto.toFixed(2) + ' (del estado de cuenta)' : 'Escriba el saldo')}</label>
+        <label class="f">Sistema · saldo inicial${inp('librosIni', c.I.librosIni, c.librosIniDef != null ? c.librosIniDef.toFixed(2) + ' (del cierre anterior)' : 'Saldo del sistema al iniciar')}</label>
+        <label class="f">Sistema · saldo final${inp('librosFin', c.I.librosFin, c.librosCalc.toFixed(2) + ' (calculado)')}</label>
+      </div>
+      <p class="small muted" style="margin:0">Deje vacío para usar el valor sugerido. El saldo final del sistema es el que muestra su sistema al cierre: si no coincide con lo calculado, faltan días o movimientos por pegar.</p>
+      ${c.supuestoIni ? `<div class="banner ex" style="margin:0">No hay cierre anterior ni saldo inicial del sistema: se asume igual al saldo inicial del banco. Escriba el saldo real del sistema para que la conciliación sea completa.</div>` : ''}
+    </div>
+    <div class="panel stack"><h3 style="font-size:15px">Revisiones</h3>
+      <div class="kv"><span>Estado de cuenta: inicial + movimientos = final</span>${Math.abs(c.checkBanco) < 0.005 ? '<span class="pill ok">Correcto</span>' : `<span class="pill bad">Falta ${fmt(-c.checkBanco)}</span>`}</div>
+      <div class="kv"><span>Estado de cuenta cubre hasta el ${fdl(c.hasta)}</span>${c.ultimoBanco && c.ultimoBanco >= c.hasta ? '<span class="pill ok">Sí</span>' : `<span class="pill warn">Llega al ${fdl(c.ultimoBanco) || '—'}</span>`}</div>
+      <div class="kv"><span>Sistema: inicial + movimientos pegados = final</span>${Math.abs(c.librosFin - c.librosCalc) < 0.005 ? '<span class="pill ok">Correcto</span>' : `<span class="pill bad">Dif. ${fmt(c.librosFin - c.librosCalc)}</span>`}</div>
+      <div class="kv"><span>Saldo inicial sistema vs banco</span>${Math.abs(c.Iv) < 0.005 ? '<span class="pill ok">Iguales</span>' : `<span class="pill warn">Dif. ${fmt(c.Iv)}</span>`}</div>
+      <div class="kv"><span>Movimientos conciliados</span><span class="num">${c.conciliados}</span></div>
+    </div>
+  </div>
+  <div class="tw"><table class="estado"><tbody>
+    ${filaMonto('Saldo según estado de cuenta al ' + fdl(c.hasta), c.bancoFin, 'tot')}
+    ${filaMonto('(+) Ingresos en el sistema que el banco aún no muestra', c.A)}
+    ${filaMonto('(−) Egresos en el sistema que el banco aún no muestra', -c.B)}
+    ${filaMonto('(−) Créditos del banco no registrados en el sistema', -c.C)}
+    ${filaMonto('(+) Débitos del banco no registrados en el sistema', c.D)}
+    ${filaMonto('(±) Diferencias en vínculos y cruces con otros períodos', c.M)}
+    ${filaMonto('(±) Diferencia de saldos iniciales (sistema − banco)', c.Iv)}
+    ${filaMonto('= Saldo que debería tener el sistema', c.E, 'tot')}
+    ${filaMonto('Saldo según el sistema', c.librosFin)}
+    ${filaMonto('Diferencia sin explicar', c.resid, ok ? 'tot ok' : 'tot bad')}
+  </tbody></table></div>
+  <details><summary>Partidas pendientes (${c.pendS.length + c.pendB.length})</summary>
+    <div class="tw" style="margin-top:8px"><table><thead><tr><th>Origen</th><th>Fecha</th><th>Descripción</th><th class="r">Monto</th></tr></thead><tbody>
+    ${[...c.pendS, ...c.pendB].map(x => `<tr><td>${x.lado === 's' ? 'Sistema' : 'Banco'}${ST.man.just[x.id] ? ' <span class="pill">Justificado</span>' : ''}</td><td>${fdl(x.f)}</td><td>${esc((x.doc ? x.doc + ' ' : '') + x.desc)}${ST.man.just[x.id]?.nota ? `<div class="sub">${esc(ST.man.just[x.id].nota)}</div>` : ''}</td><td class="r num ${x.dir}">${fmt(sgn(x))}</td></tr>`).join('') || '<tr><td colspan="4" class="empty">Sin partidas pendientes</td></tr>'}
+    </tbody></table></div></details>
+  <div class="row"><input type="text" id="cierreNota" value="${esc(c.I.nota || '')}" placeholder="Nota del cierre (opcional)" style="flex:1;min-width:200px">
+    <button class="btn pri" data-act="guardarCierre">${c.guardado ? 'Actualizar cierre' : 'Guardar cierre'}</button></div>
+  </div>`;
+  return h;
+}
+function snapshotCierre(c) {
+  return { desde: c.desde, hasta: c.hasta, bancoIni: c.bancoIni, bancoFin: c.bancoFin, librosIni: c.librosIni, librosFin: c.librosFin, librosCalc: c.librosCalc,
+    netoS: c.netoS, netoB: c.netoB, A: c.A, B: c.B, C: c.C, D: c.D, M: c.M, Iv: c.Iv, E: c.E, resid: c.resid, checkBanco: c.checkBanco, conciliados: c.conciliados, supuestoIni: c.supuestoIni,
+    bancoIniIn: c.I.bancoIni ?? '', bancoFinIn: c.I.bancoFin ?? '', librosIniIn: c.I.librosIni ?? '', librosFinIn: c.I.librosFin ?? '',
+    partidas: [...c.pendS, ...c.pendB].map(x => ({ lado: x.lado, f: x.f, doc: x.doc || '', desc: x.desc, monto: x.monto, dir: x.dir, just: !!ST.man.just[x.id], nota: ST.man.just[x.id]?.nota || '' })) };
+}
+function estadoHtml(d) {
+  return `<div class="tw"><table class="estado"><tbody>
+    ${filaMonto('Saldo según estado de cuenta al ' + fdl(d.hasta), d.bancoFin, 'tot')}
+    ${filaMonto('(+) Ingresos en el sistema que el banco aún no muestra', d.A)}
+    ${filaMonto('(−) Egresos en el sistema que el banco aún no muestra', -d.B)}
+    ${filaMonto('(−) Créditos del banco no registrados en el sistema', -d.C)}
+    ${filaMonto('(+) Débitos del banco no registrados en el sistema', d.D)}
+    ${filaMonto('(±) Diferencias en vínculos y cruces con otros períodos', d.M)}
+    ${filaMonto('(±) Diferencia de saldos iniciales (sistema − banco)', d.Iv)}
+    ${filaMonto('= Saldo que debería tener el sistema', d.E, 'tot')}
+    ${filaMonto('Saldo según el sistema', d.librosFin)}
+    ${filaMonto('Diferencia sin explicar', d.resid, Math.abs(d.resid) < 0.005 ? 'tot ok' : 'tot bad')}
+  </tbody></table></div>`;
+}
+function nombrePeriodo(desde, hasta) { const m = mesContable(desde); return m.desde === desde && m.hasta === hasta ? nombreMesContable(desde) : `${fdl(desde)} al ${fdl(hasta)}`; }
+function vHistorial() {
+  const cs = [...(ST.cierres || [])];
+  const orden = ST.cfg.bancos.map(b => b.id);
+  cs.sort((a, b) => orden.indexOf(a.banco) - orden.indexOf(b.banco) || (a.desde < b.desde ? 1 : -1));
+  let h = `<div class="stack"><div class="panel stack"><h2 style="font-size:18px">Historial de cierres</h2>
+    <p class="muted small" style="margin:0;max-width:70ch">Cada cierre guarda los saldos, el estado de conciliación y las partidas pendientes de ese momento. Para hacer uno, en Conciliar elija el banco y el período y abra la pestaña Cierre.</p>`;
+  if (!cs.length) return h + `<p class="muted" style="margin:0">Todavía no hay cierres guardados.</p></div></div>`;
+  h += `<div class="tw"><table><thead><tr><th>Banco</th><th>Período</th><th class="r">Saldo banco</th><th class="r">Saldo sistema</th><th class="r">Pendientes</th><th>Resultado</th><th>Guardado</th><th></th></tr></thead><tbody>`;
+  for (const c of cs) {
+    const d = c.datos; const ok = Math.abs(+c.diferencia) < 0.005;
+    h += `<tr><td><b>${esc(bancoN(c.banco))}</b></td><td>${esc(nombrePeriodo(c.desde, c.hasta))}</td><td class="r num">${fmt(d.bancoFin)}</td><td class="r num">${fmt(d.librosFin)}</td><td class="r num">${(d.partidas || []).length}</td>
+      <td>${ok ? '<span class="pill ok">Cuadra</span>' : `<span class="pill bad">Dif. ${fmt(+c.diferencia)}</span>`}</td>
+      <td class="small">${fdl(String(c.created_at).slice(0, 10))}<div class="sub">${esc(c.created_by || '')}</div></td>
+      <td><div class="row" style="gap:6px;flex-wrap:nowrap"><button class="btn sm" data-act="verCierre" data-id="${c.id}">${UI.verCierre == c.id ? 'Ocultar' : 'Ver'}</button><button class="btn sm" data-act="abrirCierre" data-id="${c.id}">Abrir</button></div></td></tr>`;
+    if (UI.verCierre == c.id) {
+      h += `<tr><td colspan="8" style="background:var(--sunk)"><div class="stack">
+        ${c.nota ? `<div><b>Nota:</b> ${esc(c.nota)}</div>` : ''}
+        <div class="small muted">Saldo inicial banco ${fmt(d.bancoIni)} · saldo inicial sistema ${fmt(d.librosIni)}${d.supuestoIni ? ' (asumido)' : ''} · ${d.conciliados} conciliados</div>
+        ${estadoHtml(d)}
+        <div class="tw"><table><thead><tr><th>Origen</th><th>Fecha</th><th>Descripción</th><th class="r">Monto</th></tr></thead><tbody>
+          ${(d.partidas || []).map(x => `<tr><td>${x.lado === 's' ? 'Sistema' : 'Banco'}${x.just ? ' <span class="pill">Justificado</span>' : ''}</td><td>${fdl(x.f)}</td><td>${esc((x.doc ? x.doc + ' ' : '') + x.desc)}${x.nota ? `<div class="sub">${esc(x.nota)}</div>` : ''}</td><td class="r num ${x.dir}">${fmt(x.dir === 'in' ? x.monto : -x.monto)}</td></tr>`).join('') || '<tr><td colspan="4" class="empty">Sin partidas pendientes</td></tr>'}
+        </tbody></table></div>
+        <div class="row">${UI.confirm === 'cierre:' + c.id ? `<span class="confirm">¿Borrar este cierre? <button class="btn sm danger" data-act="borrarCierre" data-id="${c.id}">Sí, borrar</button><button class="btn sm" data-act="cancelConfirm">No</button></span>` : `<button class="btn sm ghost danger" data-act="confirm" data-k="cierre:${c.id}">Borrar cierre</button>`}</div>
+      </div></td></tr>`;
+    }
+  }
+  return h + `</tbody></table></div></div></div>`;
+}
+
 function vConciliar() {
   const hayDatos = Object.keys(ST.sis).length || Object.keys(ST.mov).some(k => (ST.mov[k] || []).length);
   if (!hayDatos) return vInicio();
@@ -811,12 +978,13 @@ function vConciliar() {
   </div>`;
   if (r.sinEstado) h += `<div class="banner ex">No hay estado de cuenta de ${esc(bancoN(r.bancoId))} cargado. Súbalo en <b>Estados de cuenta</b> para poder cruzar.</div>`;
   const grupos = gruposCargos();
-  const tabs = [['pend', 'Pendientes', t.nPendS + t.nPendB], ['cargos', 'Cargos bancarios', grupos.length], ['conc', 'Conciliados', r.matches.length], ['dias', 'Por día', r.dias.length], ['just', 'Justificados', r.justificados.length]];
+  const tabs = [['pend', 'Pendientes', t.nPendS + t.nPendB], ['cargos', 'Cargos bancarios', grupos.length], ['conc', 'Conciliados', r.matches.length], ['dias', 'Por día', r.dias.length], ['just', 'Justificados', r.justificados.length], ['cierre', 'Cierre', '']];
   h += `<div class="seg" role="tablist">${tabs.map(([k, l, n]) => `<button data-act="vista" data-k="${k}" aria-selected="${UI.vista === k}">${l}<span class="n">${n}</span></button>`).join('')}</div>`;
   if (UI.vista === 'pend') h += vPendientes(r);
   else if (UI.vista === 'conc') h += vConciliados(r);
   else if (UI.vista === 'cargos') h += vCargos(grupos);
   else if (UI.vista === 'dias') h += vDias(r);
+  else if (UI.vista === 'cierre') h += vCierre(r);
   else h += vJustificados(r);
   return h + `</div>`;
 }
@@ -1198,7 +1366,12 @@ function exportar() {
     resumen.push({ Banco: bancoN(id), 'Ingresos sistema': r.tot.sIn, 'Créditos banco': r.tot.bIn, 'Egresos sistema': r.tot.sOut, 'Débitos banco': r.tot.bOut, Conciliados: r.tot.conc, 'Pendientes sistema': r.tot.nPendS, 'Monto pend. sistema': r.tot.pendS, 'Pendientes banco': r.tot.nPendB, 'Monto pend. banco': r.tot.pendB });
   }
   const add = (rows, name) => XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows.length ? rows : [{ '': 'Sin datos' }]), name);
-  add(resumen, 'Resumen'); add(all.ps, 'Solo en sistema'); add(all.pb, 'Solo en banco'); add(all.conc, 'Conciliados'); add(all.dias, 'Por día'); add(all.just, 'Justificados');
+  const cierreRows = Object.keys(RES).flatMap(id => { const c = datosCierre(id); if (!c) return []; const b = bancoN(id); return [
+    ['Saldo según estado de cuenta', c.bancoFin], ['(+) Ingresos en sistema no vistos en banco', c.A], ['(−) Egresos en sistema no vistos en banco', -c.B],
+    ['(−) Créditos del banco no registrados', -c.C], ['(+) Débitos del banco no registrados', c.D], ['(±) Diferencias en vínculos y otros períodos', c.M],
+    ['(±) Diferencia de saldos iniciales', c.Iv], ['= Saldo que debería tener el sistema', c.E], ['Saldo según el sistema', c.librosFin], ['Diferencia sin explicar', c.resid]
+  ].map(([Concepto, Monto]) => ({ Banco: b, Período: nombrePeriodo(c.desde, c.hasta), Concepto, Monto })); });
+  add(resumen, 'Resumen'); add(cierreRows, 'Cierre'); add(all.ps, 'Solo en sistema'); add(all.pb, 'Solo en banco'); add(all.conc, 'Conciliados'); add(all.dias, 'Por día'); add(all.just, 'Justificados');
   const out = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
   const nombre = mesContableActivo() ? `Conciliacion mes contable ${MESES_N[+UI.desde.slice(5, 7) - 1]} ${UI.desde.slice(0, 4)}.xlsx` : `Conciliacion ${UI.desde}${UI.hasta !== UI.desde ? ' a ' + UI.hasta : ''}.xlsx`;
   descargar(nombre, new Blob([out], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
@@ -1258,6 +1431,17 @@ document.addEventListener('click', e => {
       const m = mesContable(d.toISOString().slice(0, 10));
       UI.desde = m.desde; UI.hasta = m.hasta; UI.sel.clear(); render(); asegurarMovs(UI.desde).then(render);
     },
+    guardarCierre: async () => {
+      const c = datosCierre(UI.banco); if (!c) return;
+      c.I.nota = ($('#cierreNota') || {}).value || '';
+      let row;
+      try { row = await dbCierre({ banco: c.bid, desde: c.desde, hasta: c.hasta, datos: snapshotCierre(c), diferencia: c.resid, nota: c.I.nota || null }); } catch (e) { return; }
+      ST.cierres = (ST.cierres || []).filter(x => !(x.banco === row.banco && x.desde === row.desde && x.hasta === row.hasta)).concat(row);
+      delete UI.cierreIn[claveCierre(c.bid)]; render();
+    },
+    verCierre: () => { UI.verCierre = UI.verCierre == el.dataset.id ? null : el.dataset.id; UI.confirm = null; render(); },
+    abrirCierre: () => { const c = ST.cierres.find(x => x.id == el.dataset.id); if (!c) return; UI.desde = c.desde; UI.hasta = c.hasta; UI.banco = c.banco; UI.vista = 'cierre'; UI.tab = 'conciliar'; render(); asegurarMovs(c.desde).then(render); },
+    borrarCierre: async () => { const id = el.dataset.id; try { await dbBorrarCierre(id); } catch (e) { return; } ST.cierres = ST.cierres.filter(x => x.id != id); UI.confirm = null; UI.verCierre = null; render(); },
     exportar, copiarPend: copiarPendientes,
     vincular1: async () => { const l = { s: [el.dataset.s], b: [el.dataset.b], nota: '' }; try { await dbLink(l); } catch (e) { return; } ST.man.links.push(l); render(); },
     vincularSel: async () => {
@@ -1363,6 +1547,10 @@ document.addEventListener('change', async e => {
   if (t.id === 'impHeader') { UI.imp.map.headerRow = Math.max(0, (+t.value || 1) - 1); UI.imp.map.cols = E.detectarColumnas(UI.imp.grid[UI.imp.map.headerRow] || []); render(); return; }
   if (t.dataset.col) { const v = t.value; if (v === '') delete UI.imp.map.cols[t.dataset.col]; else UI.imp.map.cols[t.dataset.col] = +v; render(); return; }
   if (t.id === 'sisFecha') { UI.sisFecha = t.value; UI.sisTexto = ($('#sisTexto') || {}).value || UI.sisTexto; render(); return; }
+  if (t.dataset.cierre) {
+    const k = claveCierre(UI.banco); const base = UI.cierreIn[k] || { ...(datosCierre(UI.banco) || {}).I };
+    base[t.dataset.cierre] = t.value; base.nota = ($('#cierreNota') || {}).value ?? base.nota; UI.cierreIn[k] = base; setTimeout(render, 0); return;
+  }
   const bc = t.closest('.bank-cfg');
   if (bc) {
     const b = ST.cfg.bancos.find(x => x.id === bc.dataset.bank); const k = t.dataset.k;
