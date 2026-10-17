@@ -123,6 +123,7 @@ td .sub{color:var(--muted);font-size:12px}
 .toggles label{display:flex;gap:6px;align-items:center}
 .avisos{margin:0;padding-left:18px;color:var(--warn);font-size:13.5px}
 .okmsg{color:var(--ok);font-weight:600}
+.banco-h td{background:var(--accent-soft)}
 .acceso{max-width:440px;margin:24px auto 0}
 .acceso input{width:100%}
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(18px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:999px;font-weight:600;z-index:20;max-width:calc(100% - 32px)}
@@ -378,6 +379,10 @@ const E = (() => {
     const hi = extra > 0 ? habil(esp + extra) : esp;
     return { D, esp, lo: D - (+cfg.antes || 0), hi };
   }
+  const CARGOS_BASE = ['TS M:', 'COMI.DB', 'COMISION', 'COMISIÓN', 'TASA DE SEGURIDAD', 'TASA SEGURIDAD', 'LEY POBLACIONAL', 'IMPUESTO SOBRE INTERES'];
+  const tiene = (txt, keys) => { const d = norm(txt); return (keys || CARGOS_BASE).some(k => k && d.includes(norm(k))); };
+  const esCargo = (x, keys) => x.dir === 'out' && tiene(x.desc, keys);
+  const esRegistroCargo = (s, keys) => /^gb$/i.test(String(s.doc || '').trim()) || tiene(s.desc, keys);
   function subset(pool, target, maxK, budget = 60000) {
     pool = pool.filter(x => x.c <= target).sort((a, b) => b.c - a.c);
     const suf = new Array(pool.length + 1).fill(0);
@@ -398,7 +403,8 @@ const E = (() => {
   }
   const digitos = c => String(Math.abs(c)).split('').sort().join('');
 
-  function conciliar({ bancoId, cfg, feriados, sis, mov, man, desde, hasta }) {
+  function conciliar({ bancoId, cfg, feriados, sis, mov, man, desde, hasta, cargos }) {
+    cargos = cargos || CARGOS_BASE;
     const fer = new Set((feriados || []).map(dn));
     const mDesde = dn(desde), mHasta = dn(hasta);
     const span = (+cfg.antes || 0) + (+cfg.despues || 0) + 6;
@@ -414,7 +420,8 @@ const E = (() => {
     for (const it of mov || []) {
       const d = dn(it.f); if (d < mDesde - span || d > mHasta + span) continue;
       const dir = it.cred > 0 ? 'in' : 'out'; const monto = it.cred > 0 ? it.cred : it.deb;
-      B.push({ lado: 'b', id: it.id, f: it.f, dn: d, dir, c: cents(monto), monto, ref: it.ref, cod: it.cod, desc: it.desc, agencia: it.agencia });
+      const bi = { lado: 'b', id: it.id, f: it.f, dn: d, dir, c: cents(monto), monto, ref: it.ref, cod: it.cod, desc: it.desc, agencia: it.agencia };
+      bi.cargo = esCargo(bi, cargos); B.push(bi);
     }
     const byId = new Map([...S, ...B].map(x => [x.id, x]));
     const used = new Set(); const matches = [];
@@ -444,23 +451,31 @@ const E = (() => {
     for (const s of S) if (libre(s)) for (const b of idx.get(s.dir + s.c) || []) if (enVentana(s, b)) pares.push({ s, b, cost: Math.abs(b.dn - s.w.esp) * 10 + (b.dn < s.w.esp ? 5 : 0) });
     pares.sort((x, y) => x.cost - y.cost || x.s.dn - y.s.dn || x.b.dn - y.b.dn);
     for (const p of pares) if (libre(p.s) && libre(p.b)) add(p.cost === 0 ? 'exacto' : 'fecha', [p.s], [p.b]);
-    // 2) agrupados: un registro del sistema = varios del banco (p. ej. comisiones sumadas)
-    const maxK = dir => dir === 'out' ? (+cfg.maxGrupoEgr || 10) : (+cfg.maxGrupoIng || 3);
+    // 2) agrupados. Los cargos bancarios (comisiones, tasas) solo se agrupan entre sí y contra
+    //    un registro del sistema de cargos (GB o con esas palabras); nunca se mezclan con transferencias.
+    const maxK = dir => dir === 'out' ? 3 : (+cfg.maxGrupoIng || 3);
+    const atrasCargos = +cfg.diasAtrasEgr || 7;
     for (const s of S.filter(libre).sort((a, b) => b.c - a.c)) {
       if (!libre(s)) continue;
-      // los cargos del banco (comisiones) suelen registrarse sumados días después: se buscan hasta N días atrás
-      const atras = s.dir === 'out' ? (+cfg.diasAtrasEgr || 7) : 0;
-      const pool = B.filter(b => libre(b) && b.dir === s.dir && b.dn >= s.w.lo - atras && b.dn <= s.w.hi && b.c < s.c);
+      if (s.dir === 'out' && esRegistroCargo(s, cargos)) {
+        // cargos sumados en un solo registro del sistema: se buscan hasta N días atrás, prefiriendo el mismo día
+        const pool = B.filter(b => libre(b) && b.dir === 'out' && b.cargo && b.dn >= s.w.lo - atrasCargos && b.dn <= s.w.hi && b.c <= s.c);
+        const mismoDia = pool.filter(b => b.dn === s.dn || b.dn === s.w.esp);
+        const g = (mismoDia.length && subset(mismoDia, s.c, 40, 120000)) || subset(pool, s.c, 40, 120000);
+        if (g && (g.length > 1 || g[0].c === s.c)) add('agrupado', [s], g);
+        continue;
+      }
+      const pool = B.filter(b => libre(b) && !b.cargo && b.dir === s.dir && b.dn >= s.w.lo && b.dn <= s.w.hi && b.c < s.c);
       const mismoDia = pool.filter(b => b.dn === s.w.esp || b.dn === s.dn);
-      const g = subset(mismoDia, s.c, maxK(s.dir)) || (s.dir === 'out' ? subset(pool, s.c, maxK(s.dir)) : null);
+      const g = subset(mismoDia, s.c, maxK(s.dir));
       if (g) add('agrupado', [s], g);
     }
     // ... y un movimiento del banco = varios del sistema (cliente que paga dos préstamos en una transferencia)
     for (const b of B.filter(libre).sort((a, b) => b.c - a.c)) {
-      if (!libre(b)) continue;
-      const pool = S.filter(s => libre(s) && s.dir === b.dir && enVentana(s, b) && s.c < b.c);
+      if (!libre(b) || b.cargo) continue;
+      const pool = S.filter(s => libre(s) && s.dir === b.dir && !(s.dir === 'out' && esRegistroCargo(s, cargos)) && enVentana(s, b) && s.c < b.c);
       const mismoDia = pool.filter(s => s.w.esp === b.dn || s.dn === b.dn);
-      const g = subset(mismoDia, b.c, maxK(b.dir)) || (b.dir === 'out' ? subset(pool, b.c, maxK(b.dir)) : null);
+      const g = subset(mismoDia, b.c, maxK(b.dir));
       if (g) add('agrupado', g, [b]);
     }
     // 3) reporte
@@ -525,7 +540,7 @@ const E = (() => {
       }
     }
   }
-  return { norm, fixText, parseFecha, parseMonto, cents, dn, fromDn, dow, addDays, parseSistema, detectarBanco, detectarColumnas, extraerMovs, revisarSaldos, conciliar, cruzarBancos, ventana };
+  return { CARGOS_BASE, esCargo, norm, fixText, parseFecha, parseMonto, cents, dn, fromDn, dow, addDays, parseSistema, detectarBanco, detectarColumnas, extraerMovs, revisarSaldos, conciliar, cruzarBancos, ventana };
 })();
 if (typeof module !== 'undefined') module.exports = E;
 
@@ -540,7 +555,7 @@ const BANCOS_BASE = [
   { id:'occidente', nombre:'Occidente', alias:['occidente','banco de occidente'], antes:0, despues:1, finde:false, nocturno:false, activo:true },
   { id:'banrural', nombre:'Banrural', alias:['banrural'], antes:0, despues:1, finde:false, nocturno:false, activo:true }
 ];
-const CARGOS_BASE = ['TS M:', 'COMI.DB', 'COMISION', 'COMISIÓN', 'TASA DE SEGURIDAD', 'TASA SEGURIDAD', 'IMPUESTO SOBRE INTERES'];
+const CARGOS_BASE = E.CARGOS_BASE;
 const vacio = () => ({ cfg:{ bancos: structuredClone(BANCOS_BASE), feriados:[], cuentas:{}, cargos: CARGOS_BASE.slice() }, mov:{}, sis:{}, man:{ links:[], just:{}, noAuto:[] } });
 let ST = vacio();
 let REAL = null;            // guarda el estado real mientras se ve el ejemplo
@@ -735,7 +750,7 @@ function calcular() {
   for (const b of bancosActivos()) {
     const tieneSis = Object.values(ST.sis).some(d => d.secciones && d.secciones[b.id] && d.secciones[b.id].items.length);
     if (!tieneSis && !(ST.mov[b.id] || []).length) continue;
-    RES[b.id] = E.conciliar({ bancoId: b.id, cfg: b, feriados: ST.cfg.feriados, sis: ST.sis, mov: ST.mov[b.id] || [], man: ST.man, desde, hasta });
+    RES[b.id] = E.conciliar({ bancoId: b.id, cfg: b, feriados: ST.cfg.feriados, sis: ST.sis, mov: ST.mov[b.id] || [], man: ST.man, desde, hasta, cargos: ST.cfg.cargos || CARGOS_BASE });
     RES[b.id].sinEstado = !(ST.mov[b.id] || []).length;
   }
   E.cruzarBancos(RES);
@@ -859,11 +874,7 @@ function vConciliados(r) {
 }
 /* Cargos bancarios (comisiones, tasas) que están en el banco y no en el sistema,
    agrupados por banco y fecha para pegarlos en el sistema como un solo movimiento. */
-function esCargo(x) {
-  if (x.dir !== 'out') return false;
-  const d = E.norm(x.desc);
-  return (ST.cfg.cargos || CARGOS_BASE).some(k => k && d.includes(E.norm(k)));
-}
+const esCargo = x => E.esCargo(x, ST.cfg.cargos || CARGOS_BASE);
 const m2 = n => (Math.round(n * 100) / 100).toFixed(2);
 function gruposCargos() {
   const g = new Map();
@@ -875,7 +886,7 @@ function gruposCargos() {
   }
   const orden = ST.cfg.bancos.map(b => b.id);
   return [...g.values()].map(o => ({ ...o, total: o.total / 100, desc: o.items.map(x => `${x.desc} ${m2(x.monto)}`).join(' ') }))
-    .sort((a, b) => a.f < b.f ? -1 : a.f > b.f ? 1 : orden.indexOf(a.banco) - orden.indexOf(b.banco));
+    .sort((a, b) => orden.indexOf(a.banco) - orden.indexOf(b.banco) || (a.f < b.f ? -1 : a.f > b.f ? 1 : 0));
 }
 const filaCargo = o => [bancoN(o.banco), fdl(o.f), o.desc, m2(o.total)].join('\t');
 /* Agrega los grupos marcados como registrados a los registros del sistema de su fecha */
@@ -919,6 +930,10 @@ function vCargos(grupos) {
     <div class="row"><button class="btn" data-act="copiarCargos">Copiar todo</button><button class="btn pri" data-act="registrarCargos">Marcar todos como registrados</button></div></div>
   <div class="tw"><table><thead><tr><th>Banco</th><th>Fecha</th><th>Descripción</th><th class="r">Monto</th><th></th></tr></thead><tbody>`;
   grupos.forEach((o, i) => {
+    if (i === 0 || grupos[i - 1].banco !== o.banco) {
+      const del = grupos.filter(g => g.banco === o.banco);
+      h += `<tr class="banco-h"><td colspan="3"><b>${esc(bancoN(o.banco))}</b> <span class="sub">${del.length} día${del.length > 1 ? 's' : ''}</span></td><td class="r num"><b>${fmt(del.reduce((a, g) => a + g.total, 0))}</b></td><td></td></tr>`;
+    }
     h += `<tr><td><b>${esc(bancoN(o.banco))}</b></td><td>${fdl(o.f)}</td><td>${esc(o.desc)}<div class="sub">${o.items.length} cargo${o.items.length > 1 ? 's' : ''}</div></td><td class="r num">${fmt(o.total)}</td><td><div class="row" style="gap:6px;flex-wrap:nowrap"><button class="btn sm" data-act="copiarCargo" data-i="${i}">Copiar</button><button class="btn sm" data-act="registrarCargo" data-i="${i}">Marcar registrado</button></div></td></tr>`;
   });
   return h + `</tbody></table></div><p class="muted small">Se copia en columnas: banco, fecha, descripción y monto. Las palabras que identifican un cargo se ajustan en Ajustes.</p>`;
