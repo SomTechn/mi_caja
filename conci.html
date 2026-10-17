@@ -124,6 +124,9 @@ td .sub{color:var(--muted);font-size:12px}
 .avisos{margin:0;padding-left:18px;color:var(--warn);font-size:13.5px}
 .okmsg{color:var(--ok);font-weight:600}
 .banco-h td{background:var(--accent-soft)}
+.th-sort{border:0;background:none;padding:0;font:inherit;color:inherit;text-transform:inherit;letter-spacing:inherit;cursor:pointer}
+.th-sort:hover{color:var(--ink)}
+pre.logjson{white-space:pre-wrap;font-size:11.5px;background:var(--sunk);padding:8px;border-radius:6px;max-height:260px;overflow:auto;margin:6px 0 0}
 .justform select{max-width:100%}
 ul.hist{margin:8px 0 0;padding-left:18px;font-size:13px;color:var(--muted)}
 ul.hist li{margin-bottom:4px}
@@ -161,7 +164,9 @@ details summary{cursor:pointer;font-weight:600}
       <button role="tab" data-tab="conciliar" aria-selected="true">Conciliar</button>
       <button role="tab" data-tab="bancos" aria-selected="false">Estados de cuenta</button>
       <button role="tab" data-tab="sistema" aria-selected="false">Reporte del sistema</button>
+      <button role="tab" data-tab="movimientos" aria-selected="false">Movimientos</button>
       <button role="tab" data-tab="historial" aria-selected="false">Historial</button>
+      <button role="tab" data-tab="bitacora" aria-selected="false">Bitácora</button>
       <button role="tab" data-tab="ajustes" aria-selected="false">Ajustes</button>
     </nav>
   </header>
@@ -417,7 +422,8 @@ const E = (() => {
   }
   const digitos = c => String(Math.abs(c)).split('').sort().join('');
 
-  function conciliar({ bancoId, cfg, feriados, sis, mov, man, desde, hasta, cargos }) {
+  function conciliar({ bancoId, cfg, feriados, sis, mov, man, desde, hasta, cargos, tolerancia }) {
+    const tol = Math.round((+tolerancia || 0) * 100);
     cargos = cargos || CARGOS_BASE;
     const fer = new Set((feriados || []).map(dn));
     const mDesde = dn(desde), mHasta = dn(hasta);
@@ -463,26 +469,38 @@ const E = (() => {
     const idx = new Map();
     for (const b of B) if (libre(b)) { const k = b.dir + b.c; if (!idx.has(k)) idx.set(k, []); idx.get(k).push(b); }
     const pares = [];
-    for (const s of S) if (libre(s)) for (const b of idx.get(s.dir + s.c) || []) if (enVentana(s, b)) pares.push({ s, b, cost: Math.abs(b.dn - s.w.esp) * 10 + (b.dn < s.w.esp ? 5 : 0) });
+    for (const s of S) if (libre(s)) for (const b of idx.get(s.dir + s.c) || []) if (enVentana(s, b)) { const dd = Math.min(Math.abs(b.dn - s.dn), Math.abs(b.dn - s.w.esp)); pares.push({ s, b, cost: dd * 10 + (b.dn !== s.dn ? 1 : 0) + (b.dn < s.dn ? 5 : 0) }); }
     pares.sort((x, y) => x.cost - y.cost || x.s.dn - y.s.dn || x.b.dn - y.b.dn);
     for (const p of pares) if (libre(p.s) && libre(p.b)) add(p.cost === 0 ? 'exacto' : 'fecha', [p.s], [p.b]);
+    // 1b) diferencias de centavos (hasta la tolerancia de Ajustes)
+    if (tol > 0) {
+      const p2 = [];
+      for (const s of S) if (libre(s)) for (const b of B) if (libre(b) && b.dir === s.dir && !b.cargo && b.c !== s.c && Math.abs(b.c - s.c) <= tol && enVentana(s, b))
+        p2.push({ s, b, cost: Math.min(Math.abs(b.dn - s.dn), Math.abs(b.dn - s.w.esp)) * 1000 + Math.abs(b.c - s.c) });
+      p2.sort((x, y) => x.cost - y.cost);
+      for (const p of p2) if (libre(p.s) && libre(p.b)) add('centavos', [p.s], [p.b]);
+    }
     // 2) agrupados. Los cargos bancarios (comisiones, tasas) solo se agrupan entre sí y contra
     //    un registro del sistema de cargos (GB o con esas palabras); nunca se mezclan con transferencias.
     const maxK = dir => dir === 'out' ? 3 : (+cfg.maxGrupoIng || 3);
     const atrasCargos = +cfg.diasAtrasEgr || 7;
+    // cargos: primero el mismo día, luego el día hábil esperado y por último la ventana (hasta N días atrás)
+    const regCargos = S.filter(s => s.dir === 'out' && esRegistroCargo(s, cargos)).sort((a, b) => a.dn - b.dn || b.c - a.c);
+    for (const etapa of [0, 1, 2]) for (const s of regCargos) {
+      if (!libre(s)) continue;
+      const pool = B.filter(b => libre(b) && b.dir === 'out' && b.cargo && b.c <= s.c && (etapa === 0 ? b.dn === s.dn : etapa === 1 ? b.dn === s.w.esp : (b.dn >= s.w.lo - atrasCargos && b.dn <= s.w.hi)));
+      if (!pool.length) continue;
+      const g = subset(pool, s.c, 40, 120000);
+      if (g) add('agrupado', [s], g);
+    }
     for (const s of S.filter(libre).sort((a, b) => b.c - a.c)) {
       if (!libre(s)) continue;
-      if (s.dir === 'out' && esRegistroCargo(s, cargos)) {
-        // cargos sumados en un solo registro del sistema: se buscan hasta N días atrás, prefiriendo el mismo día
-        const pool = B.filter(b => libre(b) && b.dir === 'out' && b.cargo && b.dn >= s.w.lo - atrasCargos && b.dn <= s.w.hi && b.c <= s.c);
-        const mismoDia = pool.filter(b => b.dn === s.dn || b.dn === s.w.esp);
-        const g = (mismoDia.length && subset(mismoDia, s.c, 40, 120000)) || subset(pool, s.c, 40, 120000);
-        if (g && (g.length > 1 || g[0].c === s.c)) add('agrupado', [s], g);
-        continue;
-      }
+      if (s.dir === 'out' && esRegistroCargo(s, cargos)) continue;
       const pool = B.filter(b => libre(b) && !b.cargo && b.dir === s.dir && b.dn >= s.w.lo && b.dn <= s.w.hi && b.c < s.c);
       const mismoDia = pool.filter(b => b.dn === s.w.esp || b.dn === s.dn);
-      const g = subset(mismoDia, s.c, maxK(s.dir));
+      let g = subset(mismoDia, s.c, maxK(s.dir));
+      // pagos de planilla o comisiones: un egreso grande del sistema = varias transferencias del mismo día
+      if (!g && s.dir === 'out' && s.c >= 500000) g = subset(mismoDia, s.c, 15, 300000);
       if (g) add('agrupado', [s], g);
     }
     // ... y un movimiento del banco = varios del sistema (cliente que paga dos préstamos en una transferencia)
@@ -571,7 +589,7 @@ const BANCOS_BASE = [
   { id:'banrural', nombre:'Banrural', alias:['banrural'], antes:0, despues:1, finde:false, nocturno:false, activo:true }
 ];
 const CARGOS_BASE = E.CARGOS_BASE;
-const vacio = () => ({ cfg:{ bancos: structuredClone(BANCOS_BASE), feriados:[], cuentas:{}, cargos: CARGOS_BASE.slice() }, mov:{}, sis:{}, man:{ links:[], just:{}, noAuto:[] }, cierres: [], casos: [], empleados: [] });
+const vacio = () => ({ cfg:{ bancos: structuredClone(BANCOS_BASE), feriados:[], cuentas:{}, cargos: CARGOS_BASE.slice(), tolerancia: 1 }, mov:{}, sis:{}, man:{ links:[], just:{}, noAuto:[] }, cierres: [], casos: [], empleados: [] });
 let ST = vacio();
 let REAL = null;            // guarda el estado real mientras se ve el ejemplo
 let ejemplo = false;
@@ -626,7 +644,7 @@ async function cargar() {
   }
   const { data: cfg, error: ec } = await SB.from('cb_config').select('data').eq('id', 1).maybeSingle();
   if (ec) throw ec;
-  if (cfg && cfg.data && cfg.data.bancos) nuevo.cfg = { bancos: cfg.data.bancos, feriados: cfg.data.feriados || [], cuentas: cfg.data.cuentas || {}, cargos: cfg.data.cargos || CARGOS_BASE.slice() };
+  if (cfg && cfg.data && cfg.data.bancos) nuevo.cfg = { bancos: cfg.data.bancos, feriados: cfg.data.feriados || [], cuentas: cfg.data.cuentas || {}, cargos: cfg.data.cargos || CARGOS_BASE.slice(), tolerancia: cfg.data.tolerancia ?? 1 };
   const [sis, links, just, noauto, cierres] = await Promise.all([
     todos(() => SB.from('cb_sistema').select('fecha,secciones,avisos,texto,updated_by,updated_at').order('fecha')),
     todos(() => SB.from('cb_vinculos').select('id,s,b,nota,created_by').order('id')),
@@ -637,6 +655,7 @@ async function cargar() {
   nuevo.cierres = cierres;
   const [casosR, empR] = await Promise.all([SB.from('cb_casos').select('*').order('created_at'), SB.rpc('cb_empleados')]);
   nuevo.casos = casosR.data || []; nuevo.empleados = empR.data || [];
+  try { const { data: fer } = await SB.from('feriados').select('fecha,descripcion').order('fecha'); nuevo.feriadosBase = fer || []; } catch (e) { nuevo.feriadosBase = []; }
   sis.forEach(r => nuevo.sis[r.fecha] = { secciones: r.secciones, avisos: r.avisos || [], texto: r.texto || '', por: r.updated_by, guardado: r.updated_at });
   nuevo.man.links = links.map(r => ({ id: r.id, s: r.s || [], b: r.b || [], nota: r.nota || '', por: r.created_by }));
   just.forEach(r => nuevo.man.just[r.item_id] = { nota: r.nota || '', por: r.created_by });
@@ -735,7 +754,7 @@ async function copiar(texto, msg = 'Copiado. Péguelo en Excel.') {
 }
 
 /* ================== Navegación ================== */
-const UI = { casoAbierto: null, segFiltro: 'abiertos', verCaso: null, casoNota: null, casoAccion: null, justAbierto: null, cierreIn: {}, verCierre: null, rD: null, rH: null, tab: 'conciliar', banco: null, desde: null, hasta: null, vista: 'pend', sel: new Set(), imp: null, sisPrev: null, sisFecha: null, sisTexto: '', verDia: null, confirm: null };
+const UI = { selDep: new Set(), depCaso: false, selCaso: false, movSort: { k: 'f', dir: 'asc' }, movLim: 200, movBanco: '', movTipo: '', movEstado: '', movQ: '', logArea: '', verLog: null, casoAbierto: null, segFiltro: 'abiertos', verCaso: null, casoNota: null, casoAccion: null, justAbierto: null, cierreIn: {}, verCierre: null, rD: null, rH: null, tab: 'conciliar', banco: null, desde: null, hasta: null, vista: 'pend', sel: new Set(), imp: null, sisPrev: null, sisFecha: null, sisTexto: '', verDia: null, confirm: null };
 try { const t = localStorage.getItem('concilia.tab'); if (t) UI.tab = t; } catch (e) {}
 $('#tabs').addEventListener('click', e => {
   const b = e.target.closest('button[data-tab]'); if (!b) return;
@@ -774,6 +793,8 @@ function render() {
   else if (UI.tab === 'bancos') v.innerHTML = vBancos();
   else if (UI.tab === 'sistema') v.innerHTML = vSistema();
   else if (UI.tab === 'historial') v.innerHTML = vHistorial();
+  else if (UI.tab === 'movimientos') v.innerHTML = vMovimientos();
+  else if (UI.tab === 'bitacora') v.innerHTML = vBitacora();
   else v.innerHTML = vAjustes();
 }
 
@@ -784,6 +805,7 @@ function rangoDefecto() {
   const f = fechas.length ? fechas[fechas.length - 1] : hoy();
   UI.desde ||= f; UI.hasta ||= f;
 }
+const feriadosEfectivos = () => [...new Set([...(ST.cfg.feriados || []), ...(ST.feriadosBase || []).map(f => f.fecha)])].sort();
 function calcular() {
   rangoDefecto();
   RES = {};
@@ -792,7 +814,7 @@ function calcular() {
   for (const b of bancosActivos()) {
     const tieneSis = Object.values(ST.sis).some(d => d.secciones && d.secciones[b.id] && d.secciones[b.id].items.length);
     if (!tieneSis && !(ST.mov[b.id] || []).length) continue;
-    RES[b.id] = E.conciliar({ bancoId: b.id, cfg: b, feriados: ST.cfg.feriados, sis: ST.sis, mov: ST.mov[b.id] || [], man: ST.man, desde, hasta, cargos: ST.cfg.cargos || CARGOS_BASE });
+    RES[b.id] = E.conciliar({ bancoId: b.id, cfg: b, feriados: feriadosEfectivos(), sis: ST.sis, mov: ST.mov[b.id] || [], man: ST.man, desde, hasta, cargos: ST.cfg.cargos || CARGOS_BASE, tolerancia: ST.cfg.tolerancia ?? 1 });
     RES[b.id].sinEstado = !(ST.mov[b.id] || []).length;
   }
   E.cruzarBancos(RES);
@@ -1043,6 +1065,197 @@ function vResponsable() {
   return h + `</div></div>`;
 }
 
+/* ================== Depósitos sin aplicar (todos los bancos) ================== */
+function clienteDe(desc) {
+  const d = String(desc || '');
+  let m = d.match(/TEF DE:\s*(.+)/i); if (m) return m[1].trim();
+  m = d.match(/Transferencia entre Cuentas-(.+?)-INVERSIONES/i); if (m) return m[1].trim();
+  m = d.match(/^DEPOSITO\s+(?!EN\b|DE\b)(.+)/i); if (m) return m[1].trim();
+  m = d.match(/^Pago de\s+(.+)/i); if (m) return m[1].trim();
+  return '';
+}
+function depositosSinAplicar() {
+  const orden = ST.cfg.bancos.map(b => b.id); const out = [];
+  for (const [id, r] of Object.entries(RES)) for (const x of r.soloBan) if (x.dir === 'in' && !x.cargo) out.push({ ...x, banco: id, cliente: clienteDe(x.desc) });
+  return out.sort((a, b) => orden.indexOf(a.banco) - orden.indexOf(b.banco) || a.dn - b.dn || b.c - a.c);
+}
+function vDepositos() {
+  const deps = depositosSinAplicar(); const abiertos = casosAbiertosPorItem();
+  if (!deps.length) return `<div class="panel empty">No hay depósitos sin aplicar en estas fechas.</div>`;
+  const total = deps.reduce((a, x) => a + x.monto, 0);
+  const sel = deps.filter(x => UI.selDep.has(x.id));
+  let h = `<div class="stack"><div class="row" style="justify-content:space-between;align-items:center"><span class="muted small">${deps.length} depósitos de clientes que están en el banco y no en el sistema · total <b class="num">${fmt(total)}</b>. Pueden ser pagos sin aplicar: el cliente pagó y en el sistema puede aparecer atrasado.</span>
+    <button class="btn" data-act="copiarDeps">Copiar todos</button></div>
+  <div class="tw"><table><thead><tr><th><input type="checkbox" data-act="selDepTodos" ${sel.length === deps.length ? 'checked' : ''} aria-label="Seleccionar todos"></th><th>Banco</th><th>Fecha</th><th>Cliente</th><th>Descripción</th><th>Referencia</th><th class="r">Monto</th><th>Seguimiento</th></tr></thead><tbody>`;
+  for (const x of deps) {
+    const c = abiertos[x.id];
+    h += `<tr><td><input type="checkbox" data-act="selDep" data-id="${esc(x.id)}" ${UI.selDep.has(x.id) ? 'checked' : ''}></td><td><b>${esc(bancoN(x.banco))}</b></td><td>${fd(x.f)}</td><td>${esc(x.cliente || '—')}</td><td class="small">${esc(x.desc)}</td><td class="small">${esc(x.ref || '')}</td><td class="r num in">${fmt(x.monto)}</td><td>${c ? pillCaso(c) : ''}</td></tr>`;
+  }
+  h += `</tbody></table></div>`;
+  if (sel.length) h += `<div class="selbar"><span><b>${sel.length}</b> seleccionados · <span class="num">${fmt(sel.reduce((a, x) => a + x.monto, 0))}</span></span>
+    ${UI.depCaso ? formCasoLote('crearCasosDep', false) : `<button class="btn pri" data-act="abrirCasoLote" data-k="dep">Enviar a corrección</button><button class="btn" data-act="copiarDepsSel">Copiar seleccionados</button><button class="btn" data-act="limpiarSelDep">Quitar selección</button>`}</div>`;
+  return h + `</div>`;
+}
+const filaDep = x => [bancoN(x.banco), fdl(x.f), x.cliente, x.desc, x.ref || '', m2(x.monto)].join('\t');
+function formCasoLote(accion, conRevision) {
+  const emps = ST.empleados || [];
+  return `<select id="loteTipo"><option value="correccion">Corrección en sistema</option>${conRevision ? '<option value="revision_banco">Revisión en cuenta bancaria</option>' : ''}</select>
+    <select id="loteResp"><option value="">Responsable…</option>${emps.map(e => `<option value="${esc(e.id)}">${esc(e.nombre)}</option>`).join('')}</select>
+    <input type="text" id="loteInstr" placeholder="Instrucción para todos" maxlength="300">
+    <button class="btn pri" data-act="${accion}">Enviar</button><button class="btn" data-act="cerrarCasoLote">Cancelar</button>`;
+}
+async function crearCasosLote(items) {
+  const respId = ($('#loteResp') || {}).value; if (!respId) { toast('Elija el responsable'); return 0; }
+  const emp = (ST.empleados || []).find(e => e.id === respId) || {};
+  const tipo = ($('#loteTipo') || {}).value || 'correccion', instr = (($('#loteInstr') || {}).value || '').trim();
+  const abiertos = casosAbiertosPorItem(); let n = 0;
+  for (const x of items) {
+    if (abiertos[x.id]) continue;
+    const row = { tipo: x.lado === 'b' && tipo === 'revision_banco' ? 'correccion' : tipo, item_id: x.id, lado: x.lado, banco: x.banco || UI.banco, f: x.f, doc: x.doc || null, descripcion: x.desc, monto: x.monto, dir: x.dir,
+      responsable_id: respId, responsable_nombre: emp.nombre || null, responsable_user: emp.user_id || null, instruccion: instr || null, estado: 'pendiente', created_at: ahora(), created_by: usr(),
+      historial: [{ ts: ahora(), por: usr(), accion: 'creado', nota: instr }] };
+    try { const c = await dbCrearCaso(row); ST.casos = [...(ST.casos || []), c]; n++; } catch (e) { break; }
+  }
+  if (n) toast(`${n} enviados a ${emp.nombre || 'el responsable'}`);
+  return n;
+}
+
+/* ================== Movimientos bancarios ================== */
+function estadoMovs() {
+  const m = {};
+  for (const r of Object.values(RES)) {
+    for (const mt of r.matches) for (const b of mt.b) m[b.id] = { e: 'conciliado', t: mt.tipo, s: mt.s };
+    for (const b of r.soloBan) m[b.id] = { e: b.cargo ? 'cargo' : 'pendiente' };
+    for (const x of r.justificados) if (x.lado === 'b') m[x.id] = { e: 'justificado' };
+  }
+  return m;
+}
+function filasMovimientos() {
+  const est = estadoMovs(); const q = E.norm(UI.movQ || ''); const out = [];
+  for (const b of ST.cfg.bancos) {
+    if (UI.movBanco && UI.movBanco !== b.id) continue;
+    for (const x of ST.mov[b.id] || []) {
+      if (x.f < UI.rD || x.f > UI.rH) continue;
+      if (UI.movTipo === 'in' && !(x.cred > 0)) continue;
+      if (UI.movTipo === 'out' && !(x.deb > 0)) continue;
+      const st = est[x.id] || { e: 'pendiente' };
+      if (UI.movEstado && UI.movEstado !== st.e) continue;
+      if (q && !E.norm(`${x.desc} ${x.ref} ${x.cod} ${x.cred || x.deb}`).includes(q)) continue;
+      out.push({ ...x, banco: b.id, st });
+    }
+  }
+  const k = UI.movSort.k, s = UI.movSort.dir === 'asc' ? 1 : -1, orden = ST.cfg.bancos.map(b => b.id);
+  const val = x => k === 'monto' ? (x.cred || -x.deb) : k === 'banco' ? orden.indexOf(x.banco) : x.f;
+  out.sort((a, b) => { const va = val(a), vb = val(b); return (va < vb ? -1 : va > vb ? 1 : (a.orden || 0) - (b.orden || 0)) * s; });
+  return out;
+}
+const ESTADO_MOV = { conciliado: ['ok', 'Conciliado'], pendiente: ['bad', 'Pendiente'], cargo: ['acc', 'Cargo sin registrar'], justificado: ['', 'Justificado'] };
+function vMovimientos() {
+  calcular();
+  const filas = filasMovimientos(); const lim = UI.movLim || 200;
+  const cred = filas.reduce((a, x) => a + x.cred, 0), deb = filas.reduce((a, x) => a + x.deb, 0);
+  const th = (k, l, cls = '') => `<th class="${cls}"><button class="th-sort" data-act="movSort" data-k="${k}">${l}${UI.movSort.k === k ? (UI.movSort.dir === 'asc' ? ' ▲' : ' ▼') : ''}</button></th>`;
+  let h = `<div class="stack"><div class="panel row">
+    <label class="f">Desde<input type="date" id="desde" value="${UI.desde}"></label>
+    <label class="f">Hasta<input type="date" id="hasta" value="${UI.hasta}"></label>
+    <div class="row mesc" style="gap:4px;align-items:center"><button class="btn sm" data-act="mesNav" data-d="-1" aria-label="Mes contable anterior">‹</button><button class="btn sm ${mesContableActivo() ? 'pri' : ''}" data-act="rango" data-k="mesc">${mesContableActivo() ? esc(nombreMesContable(UI.desde)) : 'Mes contable'}</button><button class="btn sm" data-act="mesNav" data-d="1" aria-label="Mes contable siguiente">›</button></div>
+    <label class="f">Banco<select id="movBanco"><option value="">Todos</option>${ST.cfg.bancos.filter(b => (ST.mov[b.id] || []).length).map(b => `<option value="${b.id}" ${UI.movBanco === b.id ? 'selected' : ''}>${esc(b.nombre)}</option>`).join('')}</select></label>
+    <label class="f">Tipo<select id="movTipo"><option value="">Todos</option><option value="in" ${UI.movTipo === 'in' ? 'selected' : ''}>Créditos</option><option value="out" ${UI.movTipo === 'out' ? 'selected' : ''}>Débitos</option></select></label>
+    <label class="f">Estado<select id="movEstado"><option value="">Todos</option>${Object.entries(ESTADO_MOV).map(([k, [, l]]) => `<option value="${k}" ${UI.movEstado === k ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
+    <label class="f" style="flex:1;min-width:160px">Buscar<input type="text" id="movBuscar" value="${esc(UI.movQ || '')}" placeholder="Nombre, referencia o monto"></label>
+  </div>
+  <div class="row" style="justify-content:space-between;align-items:center"><span class="small muted"><b class="num">${filas.length}</b> movimientos · créditos <b class="num in">${fmt(cred)}</b> · débitos <b class="num out">${fmt(deb)}</b></span>
+    <div class="row"><button class="btn" data-act="copiarMovs">Copiar</button><button class="btn" data-act="exportarMovs">Exportar Excel</button></div></div>
+  <div class="tw"><table><thead><tr>${th('f', 'Fecha')}${th('banco', 'Banco')}<th>Descripción</th><th>Ref.</th>${th('monto', 'Monto', 'r')}<th class="r">Saldo</th><th>Estado</th></tr></thead><tbody>`;
+  for (const x of filas.slice(0, lim)) {
+    const [cls, lbl] = ESTADO_MOV[x.st.e];
+    const con = x.st.e === 'conciliado' ? `<div class="sub">${esc(TIPO[x.st.t]?.[1] || '')}${x.st.s && x.st.s.length ? ' · ' + esc(x.st.s.map(s => (s.doc || '') + ' ' + fd(s.f)).slice(0, 2).join(', ')) : ''}</div>` : '';
+    h += `<tr><td>${fd(x.f)}<div class="sub">${x.f.slice(0, 4)}</div></td><td>${esc(bancoN(x.banco))}</td><td>${esc(x.desc)}${x.cod ? `<div class="sub">${esc(x.cod)}</div>` : ''}</td><td class="small">${esc(x.ref || '')}</td><td class="r num ${x.cred > 0 ? 'in' : 'out'}">${fmt(x.cred > 0 ? x.cred : -x.deb)}</td><td class="r num small">${x.saldo != null ? fmt(x.saldo) : ''}</td><td><span class="pill ${cls}">${lbl}</span>${con}</td></tr>`;
+  }
+  h += `</tbody></table></div>`;
+  if (filas.length > lim) h += `<div class="row"><button class="btn" data-act="movMas">Mostrar ${Math.min(200, filas.length - lim)} más (de ${filas.length - lim})</button></div>`;
+  return h + `</div>`;
+}
+
+/* ================== Bitácora ================== */
+async function cargarBitacora(mas) {
+  if (ejemplo) { ST.bitacora = []; return; }
+  const desde = mas ? (ST.bitacora || []).length : 0;
+  const { data, error } = await SB.from('cb_bitacora').select('*').order('id', { ascending: false }).range(desde, desde + 199);
+  if (error) { toast('No se pudo cargar la bitácora: ' + error.message); return; }
+  ST.bitacora = mas ? [...(ST.bitacora || []), ...data] : data; ST.bitacoraFin = data.length < 200;
+}
+function textoItem(id) {
+  if (!id) return '';
+  const p = String(id).split('|');
+  if (/^\d{4}-\d{2}-\d{2}$/.test(p[0]) && p.length === 3) { // registro del sistema
+    const it = ST.sis[p[0]]?.secciones?.[p[1]]?.items?.[+p[2]];
+    return `${bancoN(p[1])} ${fd(p[0])} · Sistema${it ? ' ' + (it.doc || '') + ' ' + fmt(it.dir === 'in' ? it.monto : -it.monto) : ''}`;
+  }
+  if (p.length >= 6) { const deb = +p[3] / 100, cred = +p[4] / 100; return `${bancoN(p[0])} ${fd(p[1])} · Banco ${fmt(cred > 0 ? cred : -deb)}`; }
+  return id;
+}
+function describirLog(e) {
+  const a = e.antes || {}, d = e.despues || {}, ac = e.accion, t = e.tabla;
+  const cuenta = (o, k) => Object.values((o.secciones) || {}).reduce((n, s) => n + (s.items || []).filter(i => i[k]).length, 0);
+  switch (t) {
+    case 'cb_vinculos': return ac === 'insert' ? `Vinculó ${(d.s || []).map(textoItem).join(' + ') || '—'} con ${(d.b || []).map(textoItem).join(' + ') || '—'}${d.nota ? ' · "' + d.nota + '"' : ''}` : ac === 'delete' ? `Separó el vínculo ${(a.s || []).map(textoItem).join(' + ')} con ${(a.b || []).map(textoItem).join(' + ')}` : 'Cambió un vínculo';
+    case 'cb_justificados': return ac === 'insert' ? `Justificó ${textoItem(d.item_id)}${d.nota ? ' · "' + d.nota + '"' : ''}` : ac === 'update' ? `Cambió la nota de ${textoItem(d.item_id)}: "${a.nota || ''}" → "${d.nota || ''}"` : `Devolvió a pendientes ${textoItem(a.item_id)}`;
+    case 'cb_noauto': return ac === 'insert' ? `Separó un cruce automático: ${textoItem(d.item_id)}` : `Restauró el cruce automático de ${textoItem(a.item_id)}`;
+    case 'cb_sistema': {
+      const f = fdl(e.clave);
+      if (ac === 'insert') return `Pegó el reporte del sistema del ${f}`;
+      if (ac === 'delete') return `Borró el reporte del sistema del ${f}`;
+      const ag = cuenta(d, 'agregado') - cuenta(a, 'agregado'), mv = cuenta(d, 'movidoDe') - cuenta(a, 'movidoDe');
+      if (ag > 0) return `Marcó ${ag} grupo${ag > 1 ? 's' : ''} de cargos como registrado${ag > 1 ? 's' : ''} (${f})`;
+      if (ag < 0) return `Quitó un cargo marcado como registrado (${f})`;
+      if (mv > 0) return `Movió ${mv} pago${mv > 1 ? 's' : ''} al banco correcto (${f})`;
+      if (mv < 0) return `Deshizo un movimiento de banco (${f})`;
+      return `Volvió a pegar el reporte del sistema del ${f}`;
+    }
+    case 'cb_movimientos': { const o = ac === 'insert' ? d : a; return `${ac === 'insert' ? 'Subió' : 'Borró'} ${o.filas} movimientos de ${bancoN(o.banco)} (${fdl(o.desde)} al ${fdl(o.hasta)})`; }
+    case 'cb_cierres': { const o = ac === 'delete' ? a : d; return `${ac === 'insert' ? 'Guardó' : ac === 'update' ? 'Actualizó' : 'Borró'} el cierre de ${bancoN(o.banco)} · ${nombrePeriodo(o.desde, o.hasta)} · diferencia ${fmt(+o.diferencia || 0)}`; }
+    case 'cb_casos': {
+      const o = ac === 'delete' ? a : d; const txt = `${bancoN(o.banco)} ${fd(o.f)} ${o.doc || ''} ${fmt(o.dir === 'in' ? +o.monto : -o.monto)}`;
+      if (ac === 'insert') return `Envió a ${o.tipo === 'revision_banco' ? 'revisión bancaria' : 'corrección'}: ${txt} → ${o.responsable_nombre || 'sin responsable'}`;
+      if (ac === 'update' && a.estado !== d.estado) { const h = (d.historial || [])[d.historial.length - 1] || {}; return `Caso ${txt}: ${ESTADOS_CASO[a.estado]?.[1] || a.estado} → ${ESTADOS_CASO[d.estado]?.[1] || d.estado}${h.nota ? ' · "' + h.nota + '"' : ''}`; }
+      return ac === 'delete' ? `Borró el caso ${txt}` : `Actualizó el caso ${txt}`;
+    }
+    case 'cb_config': {
+      const ad = a.data || {}, dd = d.data || {}; const cam = ['bancos', 'feriados', 'cuentas', 'cargos', 'tolerancia'].filter(k => JSON.stringify(ad[k]) !== JSON.stringify(dd[k]));
+      const N = { bancos: 'reglas de bancos', feriados: 'feriados', cuentas: 'cuentas de bancos', cargos: 'palabras de cargos', tolerancia: 'tolerancia de centavos' };
+      return `Cambió ajustes: ${cam.map(k => N[k]).join(', ') || 'configuración'}`;
+    }
+    case 'cb_usuarios': return ac === 'insert' ? `Dio acceso a ${d.email}` : ac === 'delete' ? `Quitó el acceso a ${a.email}` : `Cambió el usuario ${d.email}`;
+  }
+  return `${t} ${ac}`;
+}
+const AREAS_LOG = { '': 'Todo', cruce: 'Vínculos y justificados', reportes: 'Reportes del sistema', estados: 'Estados de cuenta', casos: 'Seguimiento', cierres: 'Cierres', ajustes: 'Ajustes y accesos' };
+const areaLog = t => ({ cb_vinculos: 'cruce', cb_justificados: 'cruce', cb_noauto: 'cruce', cb_sistema: 'reportes', cb_movimientos: 'estados', cb_casos: 'casos', cb_cierres: 'cierres', cb_config: 'ajustes', cb_usuarios: 'ajustes' }[t]);
+function vBitacora() {
+  if (!ST.bitacora) { cargarBitacora().then(render); return `<div class="panel empty">Cargando bitácora…</div>`; }
+  const lista = ST.bitacora.filter(e => !UI.logArea || areaLog(e.tabla) === UI.logArea);
+  let h = `<div class="stack"><div class="panel stack"><div class="row" style="justify-content:space-between;align-items:center"><h2 style="font-size:18px">Bitácora</h2><button class="btn sm" data-act="recargarBitacora">Actualizar</button></div>
+    <p class="muted small" style="margin:0;max-width:75ch">Registro automático de cada cambio en la conciliación: quién lo hizo, cuándo y cómo estaba antes. Lo guarda la base de datos, así que no se puede editar ni borrar desde la app.</p>
+    <div class="row" style="gap:6px">${Object.entries(AREAS_LOG).map(([k, l]) => `<button class="date-chip" data-act="logArea" data-k="${k}" aria-pressed="${(UI.logArea || '') === k}">${l}</button>`).join('')}</div></div>`;
+  if (!lista.length) return h + `<div class="panel empty">No hay registros en esta vista.</div></div>`;
+  h += `<div class="tw"><table><thead><tr><th>Fecha y hora</th><th>Usuario</th><th>Cambio</th><th></th></tr></thead><tbody>`;
+  for (const e of lista) {
+    h += `<tr><td class="small" style="white-space:nowrap">${fechaHora(e.ts)}</td><td class="small">${esc(e.usuario || '')}</td><td>${esc(describirLog(e))}${UI.verLog == e.id ? `<pre class="logjson">${esc(JSON.stringify({ antes: resumenJson(e.antes), despues: resumenJson(e.despues) }, null, 1))}</pre>` : ''}</td><td><button class="btn sm ghost" data-act="verLog" data-id="${e.id}">${UI.verLog == e.id ? 'Ocultar' : 'Detalle'}</button></td></tr>`;
+  }
+  h += `</tbody></table></div>`;
+  if (!ST.bitacoraFin) h += `<div class="row"><button class="btn" data-act="masBitacora">Cargar más</button></div>`;
+  return h + `</div>`;
+}
+function resumenJson(o) {
+  if (!o) return null;
+  const c = { ...o };
+  if (c.secciones) c.secciones = Object.fromEntries(Object.entries(c.secciones).map(([k, s]) => [k, `${(s.items || []).length} movimientos`]));
+  if (c.texto) c.texto = `(${String(c.texto).length} caracteres)`;
+  if (c.datos) c.datos = { saldoBanco: c.datos.bancoFin, saldoSistema: c.datos.librosFin, diferencia: c.datos.resid, partidas: (c.datos.partidas || []).length };
+  return c;
+}
+
 function vConciliar() {
   const hayDatos = Object.keys(ST.sis).length || Object.keys(ST.mov).some(k => (ST.mov[k] || []).length);
   if (!hayDatos) return vInicio();
@@ -1086,11 +1299,12 @@ function vConciliar() {
   </div>`;
   if (r.sinEstado) h += `<div class="banner ex">No hay estado de cuenta de ${esc(bancoN(r.bancoId))} cargado. Súbalo en <b>Estados de cuenta</b> para poder cruzar.</div>`;
   const grupos = gruposCargos();
-  const tabs = [['pend', 'Pendientes', t.nPendS + t.nPendB], ['cargos', 'Cargos bancarios', grupos.length], ['conc', 'Conciliados', r.matches.length], ['dias', 'Por día', r.dias.length], ['just', 'Justificados', r.justificados.length], ['seguimiento', 'Seguimiento', (ST.casos || []).filter(c => c.estado !== 'confirmado').length], ['cierre', 'Cierre', '']];
+  const tabs = [['pend', 'Pendientes', t.nPendS + t.nPendB], ['depositos', 'Depósitos sin aplicar', depositosSinAplicar().length], ['cargos', 'Cargos bancarios', grupos.length], ['conc', 'Conciliados', r.matches.length], ['dias', 'Por día', r.dias.length], ['just', 'Justificados', r.justificados.length], ['seguimiento', 'Seguimiento', (ST.casos || []).filter(c => c.estado !== 'confirmado').length], ['cierre', 'Cierre', '']];
   h += `<div class="seg" role="tablist">${tabs.map(([k, l, n]) => `<button data-act="vista" data-k="${k}" aria-selected="${UI.vista === k}">${l}<span class="n">${n}</span></button>`).join('')}</div>`;
   if (UI.vista === 'pend') h += vPendientes(r);
   else if (UI.vista === 'conc') h += vConciliados(r);
   else if (UI.vista === 'cargos') h += vCargos(grupos);
+  else if (UI.vista === 'depositos') h += vDepositos();
   else if (UI.vista === 'dias') h += vDias(r);
   else if (UI.vista === 'cierre') h += vCierre(r);
   else if (UI.vista === 'seguimiento') h += vSeguimiento();
@@ -1125,7 +1339,10 @@ function itemHtml(x, lado) {
 function vPendientes(r) {
   const col = (titulo, nota, arr, lado) => `<div><div class="colh"><h3>${titulo}</h3><span class="muted small">${nota}</span></div>
     <div class="list">${arr.length ? arr.map(x => itemHtml(x, lado)).join('') : `<div class="empty">Nada pendiente aquí.</div>`}</div></div>`;
-  let h = `<div class="cols">
+  const otros = r.soloSis.filter(x => (x.flags || []).some(f => f.t === 'otroBanco'));
+  let h = otros.length ? `<div class="banner ex" style="justify-content:space-between">${otros.length} registro${otros.length > 1 ? 's' : ''} del sistema aparece${otros.length > 1 ? 'n' : ''} en otro banco (${fmt(otros.reduce((a, x) => a + x.monto, 0))}).
+    ${UI.confirm === 'moverTodos' ? `<span class="row" style="gap:6px">¿Moverlos todos al banco donde aparecen? <button class="btn sm pri" data-act="moverTodos">Sí, mover ${otros.length}</button><button class="btn sm" data-act="cancelConfirm">No</button></span>` : `<button class="btn sm" data-act="confirm" data-k="moverTodos">Mover todos al banco correcto</button>`}</div>` : '';
+  h += `<div class="cols">
     ${col('En el sistema, no en el banco', 'Registrado pero no llegó, o llegó con otro monto o fecha', r.soloSis, 's')}
     ${col('En el banco, no en el sistema', 'Depósitos o cargos que nadie registró', r.soloBan, 'b')}
   </div>`;
@@ -1144,10 +1361,12 @@ function selBar(r) {
     <input type="text" id="notaSel" placeholder="Nota (opcional)">
     <button class="btn pri" data-act="vincularSel" ${ss.length && bb.length ? '' : 'disabled'}>Vincular</button>
     <button class="btn" data-act="justificarSel">Justificar</button>
+    <button class="btn" data-act="abrirCasoLote" data-k="sel">Enviar a corrección</button>
     <button class="btn" data-act="limpiarSel">Quitar selección</button>
+    ${UI.selCaso ? `<div class="row" style="width:100%;gap:6px">${formCasoLote('crearCasosSel', ss.length > 0)}</div>` : ''}
   </div>`;
 }
-const TIPO = { exacto: ['ok', 'Exacto'], fecha: ['acc', 'Otra fecha'], agrupado: ['warn', 'Agrupado'], manual: ['', 'Manual'] };
+const TIPO = { exacto: ['ok', 'Exacto'], fecha: ['acc', 'Otra fecha'], agrupado: ['warn', 'Agrupado'], centavos: ['acc', 'Diferencia de centavos'], manual: ['', 'Manual'] };
 function vConciliados(r) {
   if (!r.matches.length) return `<div class="panel empty">Todavía no hay movimientos conciliados en estas fechas.</div>`;
   let h = `<div class="tw"><table><thead><tr><th>Tipo</th><th>Sistema</th><th class="r">Monto sistema</th><th>Banco</th><th class="r">Monto banco</th><th></th></tr></thead><tbody>`;
@@ -1467,8 +1686,13 @@ function vAjustes() {
       <p class="muted small" style="margin:0">Un débito del banco cuya descripción contenga alguna de estas palabras se trata como cargo bancario y aparece en la lista para copiar. Una por línea.</p>
       <textarea id="cargos" style="min-height:120px">${esc((ST.cfg.cargos || CARGOS_BASE).join('\n'))}</textarea>
       <div class="row"><button class="btn" data-act="guardarCargos">Guardar palabras</button></div></div>
+    <div class="panel stack"><h2 style="font-size:18px">Tolerancia de centavos</h2>
+      <p class="muted small" style="margin:0">Diferencias de hasta este monto entre el sistema y el banco se concilian solas y quedan marcadas como "Diferencia de centavos". Use 0 para desactivarlo.</p>
+      <div class="row"><label class="f">Hasta (L)<input type="number" id="tolerancia" min="0" max="50" step="0.01" value="${ST.cfg.tolerancia ?? 1}" style="width:120px"></label><button class="btn" data-act="guardarTolerancia">Guardar</button></div></div>
     <div class="panel stack"><h2 style="font-size:18px">Feriados</h2>
-      <p class="muted small" style="margin:0">Un feriado se trata como día no hábil: lo que se registre ese día puede aparecer en el banco el siguiente día hábil. Una fecha por línea (dd/mm/aaaa).</p>
+      <p class="muted small" style="margin:0">Un feriado se trata como día no hábil: lo que se registre ese día puede aparecer en el banco el siguiente día hábil.</p>
+      ${(ST.feriadosBase || []).length ? `<div class="small"><b>Del calendario de feriados (VerifiCrédito):</b> ${ST.feriadosBase.map(f => `${fdl(f.fecha)}${f.descripcion ? ' ' + esc(f.descripcion) : ''}`).join(' · ')}</div>` : ''}
+      <p class="muted small" style="margin:0">Feriados adicionales solo para la conciliación, uno por línea (dd/mm/aaaa):</p>
       <textarea id="feriados" style="min-height:120px">${esc(ST.cfg.feriados.map(fdl).join('\n'))}</textarea>
       <div class="row"><button class="btn" data-act="guardarFeriados">Guardar feriados</button></div></div>
     <div class="panel stack"><h2 style="font-size:18px">Datos y sesión</h2>
@@ -1549,7 +1773,7 @@ function datosEjemplo() {
 document.addEventListener('click', e => {
   const el = e.target.closest('[data-act]'); if (!el) return;
   const a = el.dataset.act;
-  if (a === 'sel') return; // lo maneja change
+  if (a === 'sel' || a === 'selDep' || a === 'selDepTodos') return; // lo maneja change
   const A = {
     ir: () => { UI.tab = el.dataset.tab; render(); },
     banco: () => { UI.banco = el.dataset.id; UI.sel.clear(); render(); },
@@ -1627,6 +1851,45 @@ document.addEventListener('click', e => {
       if (error || !data) return toast('No se pudo marcar: ' + (error?.message || 'el caso ya no está pendiente'));
       const { data: mios } = await SB.from('cb_casos').select('*').order('created_at'); ST.casos = mios || []; toast('Marcado como corregido. Gracias.'); render();
     },
+    guardarTolerancia: () => { const v = Math.max(0, +($('#tolerancia').value) || 0); ST.cfg.tolerancia = Math.round(v * 100) / 100; dbCfg('Tolerancia guardada').catch(() => {}); render(); },
+    moverTodos: async () => {
+      const r = RES[UI.banco]; const lista = r.soloSis.filter(x => (x.flags || []).some(f => f.t === 'otroBanco'));
+      const porFecha = {};
+      for (const x of lista) { const [f, de, idx] = x.id.split('|'); const a = x.flags.find(f => f.t === 'otroBanco').banco; (porFecha[f] ||= []).push({ de, idx: +idx, a }); }
+      let n = 0;
+      for (const [f, movs] of Object.entries(porFecha)) {
+        const d = structuredClone(ST.sis[f]); movs.forEach(m => moverItem(d, m.de, m.idx, m.a));
+        try { await dbSis(f, d, ''); } catch (e) { break; }
+        ST.sis[f] = { ...ST.sis[f], secciones: d.secciones }; n += movs.length;
+      }
+      UI.confirm = null; if (n) toast(`${n} movidos al banco correcto. Corríjalos también en su sistema.`); render();
+    },
+    abrirCasoLote: () => { if (el.dataset.k === 'dep') UI.depCaso = true; else UI.selCaso = true; render(); },
+    cerrarCasoLote: () => { UI.depCaso = false; UI.selCaso = false; render(); },
+    crearCasosSel: async () => {
+      const r = RES[UI.banco]; const all = new Map([...r.soloSis, ...r.soloBan].map(x => [x.id, x]));
+      const items = [...UI.sel].map(id => all.get(id)).filter(Boolean).map(x => ({ ...x, banco: UI.banco }));
+      const n = await crearCasosLote(items); if (n) { UI.sel.clear(); UI.selCaso = false; } render();
+    },
+    crearCasosDep: async () => {
+      const items = depositosSinAplicar().filter(x => UI.selDep.has(x.id));
+      const n = await crearCasosLote(items); if (n) { UI.selDep.clear(); UI.depCaso = false; } render();
+    },
+    copiarDeps: () => copiar(depositosSinAplicar().map(filaDep).join('\n')),
+    copiarDepsSel: () => copiar(depositosSinAplicar().filter(x => UI.selDep.has(x.id)).map(filaDep).join('\n')),
+    limpiarSelDep: () => { UI.selDep.clear(); UI.depCaso = false; render(); },
+    movSort: () => { const k = el.dataset.k; UI.movSort = UI.movSort.k === k ? { k, dir: UI.movSort.dir === 'asc' ? 'desc' : 'asc' } : { k, dir: k === 'monto' ? 'desc' : 'asc' }; UI.movLim = 200; render(); },
+    movMas: () => { UI.movLim += 200; render(); },
+    copiarMovs: () => { const f = filasMovimientos(); copiar(['Fecha\tBanco\tDescripción\tReferencia\tCrédito\tDébito\tSaldo\tEstado', ...f.map(x => [fdl(x.f), bancoN(x.banco), x.desc, x.ref || '', x.cred ? m2(x.cred) : '', x.deb ? m2(x.deb) : '', x.saldo != null ? m2(x.saldo) : '', ESTADO_MOV[x.st.e][1]].join('\t'))].join('\n')); },
+    exportarMovs: () => {
+      const f = filasMovimientos(); const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(f.map(x => ({ Fecha: fdl(x.f), Banco: bancoN(x.banco), Descripción: x.desc, Código: x.cod || '', Referencia: x.ref || '', Crédito: x.cred || 0, Débito: x.deb || 0, Saldo: x.saldo ?? '', Estado: ESTADO_MOV[x.st.e][1] }))), 'Movimientos');
+      descargar(`Movimientos bancarios ${UI.rD} a ${UI.rH}.xlsx`, new Blob([XLSX.write(wb, { bookType: 'xlsx', type: 'array' })]));
+    },
+    logArea: () => { UI.logArea = el.dataset.k; render(); },
+    verLog: () => { UI.verLog = UI.verLog == el.dataset.id ? null : el.dataset.id; render(); },
+    recargarBitacora: async () => { await cargarBitacora(); render(); },
+    masBitacora: async () => { await cargarBitacora(true); render(); },
     exportar, copiarPend: copiarPendientes,
     vincular1: async () => { const l = { s: [el.dataset.s], b: [el.dataset.b], nota: '' }; try { await dbLink(l); } catch (e) { return; } ST.man.links.push(l); render(); },
     vincularSel: async () => {
@@ -1754,6 +2017,9 @@ document.addEventListener('click', e => {
 document.addEventListener('change', async e => {
   const t = e.target;
   if (t.dataset.act === 'sel') { t.checked ? UI.sel.add(t.dataset.id) : UI.sel.delete(t.dataset.id); render(); return; }
+  if (t.dataset.act === 'selDep') { t.checked ? UI.selDep.add(t.dataset.id) : UI.selDep.delete(t.dataset.id); render(); return; }
+  if (t.dataset.act === 'selDepTodos') { if (t.checked) depositosSinAplicar().forEach(x => UI.selDep.add(x.id)); else UI.selDep.clear(); render(); return; }
+  if (t.id === 'movBanco' || t.id === 'movTipo' || t.id === 'movEstado') { UI[t.id] = t.value; UI.movLim = 200; render(); return; }
   if (t.id === 'desde' || t.id === 'hasta') { UI[t.id] = t.value; UI.sel.clear(); render(); if (t.id === 'desde') { await asegurarMovs(t.value); render(); } return; }
   if (t.id === 'fileBanco') { for (const f of t.files) { try { await leerArchivoBanco(f); } catch (err) { toast('No se pudo leer ' + f.name); } break; } t.value = ''; return; }
   if (t.id === 'impBanco') { UI.imp.banco = t.value; render(); return; }
@@ -1778,7 +2044,9 @@ document.addEventListener('keydown', e => {
   if (e.target.id === 'justNota' && e.key === 'Enter') { e.preventDefault(); const b = document.querySelector('[data-act=confirmarJust]'); if (b) b.click(); }
   if (e.target.id === 'justNota' && e.key === 'Escape') { UI.justAbierto = null; render(); }
 });
-document.addEventListener('input', e => { if (e.target.id === 'sisTexto') UI.sisTexto = e.target.value; });
+let movQT = null;
+document.addEventListener('input', e => {
+  if (e.target.id === 'movBuscar') { UI.movQ = e.target.value; clearTimeout(movQT); movQT = setTimeout(() => { UI.movLim = 200; render(); const i = $('#movBuscar'); if (i) { i.focus(); i.setSelectionRange(i.value.length, i.value.length); } }, 300); return; } if (e.target.id === 'sisTexto') UI.sisTexto = e.target.value; });
 
 document.addEventListener('submit', async e => {
   e.preventDefault();
