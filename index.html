@@ -1667,6 +1667,20 @@
       </div>
 
       <div class="field">
+        <label for="vueltoPersonaSelect">Quién devuelve el vuelto</label>
+        <div class="person-row">
+          <select id="vueltoPersonaSelect"><option value="">Sin especificar</option></select>
+          <button type="button" class="add-person-btn" data-target="vueltoPersonaSelect">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          </button>
+        </div>
+        <div class="add-person-inline" id="addPersonRow-vueltoPersonaSelect" style="display:none;">
+          <input type="text" id="newPersonInput-vueltoPersonaSelect" placeholder="Nombre de la nueva persona">
+          <button type="button" class="add-person-confirm" data-target="vueltoPersonaSelect">Agregar</button>
+        </div>
+        <p class="hint" style="margin:6px 0 0;">La persona que trae el efectivo de vuelta. Recibe: <b id="vueltoCajeroNom">—</b> (cajero).</p>
+      </div>
+      <div class="field">
         <label>Desglose de billetes del vuelto <span style="color:var(--egreso);">*</span></label>
         <div class="denom-grid" id="vueltoDenomGrid"></div>
         <div class="cambio-tot-row"><span>Total en billetes</span><span class="mono" id="vueltoDenomTotal">L 0.00</span></div>
@@ -3048,7 +3062,8 @@ function renderPersonasOptions(){
     {el:document.getElementById("ordRecibeSelect"),empty:false},
     {el:document.getElementById("ordAutorizadorSelect"),empty:false},
     {el:document.getElementById("ordFirmarAutorizador"),empty:false},
-    {el:document.getElementById("cambioPersonaSelect"),empty:true}
+    {el:document.getElementById("cambioPersonaSelect"),empty:true},
+    {el:document.getElementById("vueltoPersonaSelect"),empty:true}
   ];
   cfg.forEach(function(c){
     if(!c.el) return;
@@ -3075,6 +3090,7 @@ function inicializarComboboxesPersona(){
   hacerSelectBuscablePersona("ordAutorizadorSelect", "Selecciona...");
   hacerSelectBuscablePersona("ordFirmarAutorizador", "Selecciona...");
   hacerSelectBuscablePersona("cambioPersonaSelect", "Sin especificar");
+  hacerSelectBuscablePersona("vueltoPersonaSelect", "Sin especificar");
 }
 
 // ================================================================
@@ -4446,6 +4462,10 @@ document.getElementById("detalleVueltoBtn").addEventListener("click",function(){
     document.getElementById("vueltoGastoReal").value="";
     document.getElementById("vueltoDenomTotal").textContent="L 0.00";
     document.getElementById("vueltoError").style.display="none";
+    // Resetear selector de persona + mostrar nombre del cajero
+    var psel=document.getElementById("vueltoPersonaSelect");
+    if(psel){ psel.value=""; if(_pcombos["vueltoPersonaSelect"]) _pcombos["vueltoPersonaSelect"].sync(); }
+    var cn=document.getElementById("vueltoCajeroNom"); if(cn) cn.textContent=nombreCajero();
     actualizarResumen();
     overlay.classList.add("open");
   }
@@ -4473,8 +4493,10 @@ document.getElementById("detalleVueltoBtn").addEventListener("click",function(){
     var submitBtn=document.getElementById("vueltoSubmit");
     submitBtn.disabled=true; submitBtn.textContent="Registrando...";
     var deso=desembolsoActual;
-    var resp=(usuarioActual && usuarioActual.nombre) ? usuarioActual.nombre : (deso.responsable||"Caja");
-    var ingreso={ id:uid(), fecha:new Date().toISOString(), tipo:"ingreso", responsable:resp, entregadoA:"",
+    var cajero=nombreCajero();
+    var persona=(document.getElementById("vueltoPersonaSelect")||{}).value||"";
+    // Ingreso del vuelto: la persona ENTREGA el efectivo que vuelve; el cajero lo RECIBE
+    var ingreso={ id:uid(), fecha:new Date().toISOString(), tipo:"ingreso", responsable:(persona||cajero), entregadoA:cajero,
       descripcion:"Vuelto de: "+(deso.descripcion||"desembolso"), denominaciones:billetes.denoms, monto:round2(vuelto),
       firmaEntrega:"", firmaRecibe:"", esPendiente:false, origenPendiente:"", esExterno:false, cambioDe:[deso.id] };
 
