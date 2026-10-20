@@ -1615,6 +1615,20 @@
         <div class="cambio-tot-row"><span>Total que entra</span><span class="mono" id="cambioEntraTotal">L 0.00</span></div>
       </div>
       <div class="field">
+        <label for="cambioPersonaSelect">Quién hace el cambio</label>
+        <div class="person-row">
+          <select id="cambioPersonaSelect"><option value="">Sin especificar</option></select>
+          <button type="button" class="add-person-btn" data-target="cambioPersonaSelect">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          </button>
+        </div>
+        <div class="add-person-inline" id="addPersonRow-cambioPersonaSelect" style="display:none;">
+          <input type="text" id="newPersonInput-cambioPersonaSelect" placeholder="Nombre de la nueva persona">
+          <button type="button" class="add-person-confirm" data-target="cambioPersonaSelect">Agregar</button>
+        </div>
+        <p class="hint" style="margin:6px 0 0;">La persona que trae los billetes a cambiar. El cajero (<b id="cambioCajeroNom">—</b>) queda como quien recibe/entrega en caja.</p>
+      </div>
+      <div class="field">
         <label for="cambioDesc">Descripción (opcional)</label>
         <input type="text" id="cambioDesc" placeholder="p. ej. Cambio de L500 en billetes chicos" autocomplete="off">
       </div>
@@ -3033,7 +3047,8 @@ function renderPersonasOptions(){
     {el:document.getElementById("entregadoASelect"),empty:true},
     {el:document.getElementById("ordRecibeSelect"),empty:false},
     {el:document.getElementById("ordAutorizadorSelect"),empty:false},
-    {el:document.getElementById("ordFirmarAutorizador"),empty:false}
+    {el:document.getElementById("ordFirmarAutorizador"),empty:false},
+    {el:document.getElementById("cambioPersonaSelect"),empty:true}
   ];
   cfg.forEach(function(c){
     if(!c.el) return;
@@ -3059,6 +3074,7 @@ function inicializarComboboxesPersona(){
   hacerSelectBuscablePersona("ordRecibeSelect", "Selecciona...");
   hacerSelectBuscablePersona("ordAutorizadorSelect", "Selecciona...");
   hacerSelectBuscablePersona("ordFirmarAutorizador", "Selecciona...");
+  hacerSelectBuscablePersona("cambioPersonaSelect", "Sin especificar");
 }
 
 // ================================================================
@@ -4266,6 +4282,10 @@ document.getElementById("detalleVueltoBtn").addEventListener("click",function(){
     construirGrid(saleGrid,"cs_"); construirGrid(entraGrid,"ce_");
     document.getElementById("cambioDesc").value="";
     document.getElementById("cambioError").style.display="none";
+    // Resetear y sincronizar el selector de persona + mostrar el nombre del cajero
+    var psel=document.getElementById("cambioPersonaSelect");
+    if(psel){ psel.value=""; if(_pcombos["cambioPersonaSelect"]) _pcombos["cambioPersonaSelect"].sync(); }
+    var cn=document.getElementById("cambioCajeroNom"); if(cn) cn.textContent=nombreCajero();
     actualizarTotales();
     overlay.classList.add("open");
   }
@@ -4305,17 +4325,19 @@ document.getElementById("detalleVueltoBtn").addEventListener("click",function(){
     var descUser=document.getElementById("cambioDesc").value.trim();
     var baseDesc=descUser||("Cambio de billetes por "+fmt(sale.total));
     var ahora=new Date().toISOString();
-    var resp=(usuarioActual && usuarioActual.nombre) ? usuarioActual.nombre : "Caja";
+    var cajero=nombreCajero();
+    var persona=(document.getElementById("cambioPersonaSelect")||{}).value||"";
 
-    // 1) Egreso (sale) -> 2) Ingreso (entra) ligado al egreso via cambioDe
-    var egreso={ id:uid(), fecha:ahora, tipo:"egreso", responsable:resp, entregadoA:"",
+    // 1) Egreso (sale): el cajero ENTREGA los billetes que salen; la persona los RECIBE
+    // 2) Ingreso (entra): la persona ENTREGA los billetes que entran; el cajero los RECIBE
+    var egreso={ id:uid(), fecha:ahora, tipo:"egreso", responsable:cajero, entregadoA:persona,
       descripcion:baseDesc+" (sale)", denominaciones:sale.denoms, monto:sale.total,
       firmaEntrega:"", firmaRecibe:"", esPendiente:false, origenPendiente:"", esExterno:false, cambioDe:[] };
 
     setSyncState("syncing","Registrando cambio...");
     apiGuardarMovimiento("addMovimiento",egreso).then(function(){
       state.movimientos.push(egreso);
-      var ingreso={ id:uid(), fecha:ahora, tipo:"ingreso", responsable:resp, entregadoA:"",
+      var ingreso={ id:uid(), fecha:ahora, tipo:"ingreso", responsable:(persona||cajero), entregadoA:cajero,
         descripcion:baseDesc+" (entra)", denominaciones:entra.denoms, monto:entra.total,
         firmaEntrega:"", firmaRecibe:"", esPendiente:false, origenPendiente:"", esExterno:false,
         cambioDe:[egreso.id] };

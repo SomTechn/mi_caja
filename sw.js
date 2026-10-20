@@ -1,7 +1,7 @@
 /* Service Worker — Flujo de Caja (Más Pisto)
    Cachea el "shell" de la app para abrir sin conexión.
    Sube la versión (CACHE) cada vez que cambie index.html para forzar actualización. */
-var CACHE = "caja-shell-v12";
+var CACHE = "caja-shell-v13";
 var SHELL = [
   "./",
   "./index.html",
