@@ -342,22 +342,24 @@
   .aud-f-item input,.aud-f-item select{border:1px solid var(--border);border-radius:8px;padding:8px 10px;
     font-size:13px;font-family:var(--font-ui);background:var(--surface-2);color:var(--ink);min-width:120px;}
   .aud-f-item input:focus,.aud-f-item select:focus{outline:none;border-color:var(--blue);background:var(--surface);}
-  .aud-tabla-scroll{overflow-x:auto;border:1px solid var(--border);border-radius:10px;}
-  .aud-tabla{width:100%;border-collapse:collapse;font-size:12.5px;min-width:820px;}
+  .aud-scroll-hint{display:none;font-size:11.5px;color:var(--ink-faint);margin:0 0 6px;}
+  .aud-tabla-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;border:1px solid var(--border);border-radius:10px;}
+  .aud-tabla{width:100%;border-collapse:collapse;font-size:12px;min-width:740px;}
   .aud-tabla thead th{position:sticky;top:0;background:var(--blue-dark);color:#fff;text-align:left;
-    padding:9px 10px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;white-space:nowrap;}
+    padding:7px 8px;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.02em;white-space:nowrap;}
   .aud-tabla th.aud-sort{cursor:pointer;user-select:none;}
   .aud-tabla th.aud-sort:hover{background:var(--blue);}
-  .aud-tabla th.aud-sort .arr{opacity:.5;font-size:10px;margin-left:3px;}
+  .aud-tabla th.aud-sort .arr{opacity:.45;font-size:9px;margin-left:2px;}
   .aud-tabla th.aud-sort.activo .arr{opacity:1;}
   .aud-col-num{text-align:right;}
-  .aud-col-chk{width:36px;text-align:center;}
-  .aud-tabla tbody td{padding:8px 10px;border-top:1px solid var(--border);vertical-align:top;}
+  .aud-col-chk{width:32px;text-align:center;}
+  .aud-tabla tbody td{padding:6px 8px;border-top:1px solid var(--border);vertical-align:top;}
   .aud-tabla tbody tr:nth-child(even){background:var(--surface-2);}
   .aud-tabla tbody tr.aud-verif{background:var(--success-bg);}
   .aud-tabla tbody tr.aud-verif:nth-child(even){background:#D7EADF;}
-  .aud-td-desc{max-width:260px;}
+  .aud-td-desc{max-width:220px;}
   .aud-td-num{text-align:right;font-family:var(--font-mono);white-space:nowrap;}
+  @media(max-width:760px){ .aud-scroll-hint{display:block;} }
   .aud-tipo-badge{display:inline-block;padding:2px 7px;border-radius:999px;font-size:10.5px;font-weight:700;white-space:nowrap;}
   .aud-tipo-ingreso{background:var(--ingreso-bg);color:var(--ingreso);}
   .aud-tipo-egreso{background:var(--egreso-bg);color:var(--egreso);}
@@ -1422,6 +1424,7 @@
         <button type="button" class="fav-limpiar" id="audLimpiar" style="align-self:flex-end;width:auto;padding:9px 14px;">Limpiar</button>
       </div>
 
+      <p class="aud-scroll-hint">↔ Desliza la tabla para ver todas las columnas.</p>
       <div class="aud-tabla-scroll">
         <table class="aud-tabla" id="audTabla">
           <thead>
@@ -5053,11 +5056,13 @@ function renderAuditoria(){
     var va=audValorOrden(a,audSort.campo), vb=audValorOrden(b,audSort.campo);
     if(va<vb) return -1*dir; if(va>vb) return 1*dir; return 0;
   });
-  // encabezados: marcar el activo con flecha
+  // encabezados: marcar el activo con flecha (la etiqueta base se guarda una sola vez)
   document.querySelectorAll("#audTabla th.aud-sort").forEach(function(th){
     th.classList.remove("activo");
     var base=th.getAttribute("data-sort");
-    var txt=th.textContent.replace(/[▲▼].*$/,"").trim();
+    var label=th.getAttribute("data-label");
+    if(label===null){ label=th.textContent.replace(/[▲▼↕]/g,"").trim(); th.setAttribute("data-label", label); }
+    var txt=esc(label);
     if(base===audSort.campo){ th.classList.add("activo"); txt+=' <span class="arr">'+(audSort.dir==="asc"?"▲":"▼")+'</span>'; }
     else { txt+=' <span class="arr">↕</span>'; }
     th.innerHTML=txt;
