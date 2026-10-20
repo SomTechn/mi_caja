@@ -327,6 +327,44 @@
     color:var(--ink-soft);border-radius:8px;padding:9px;font-size:12.5px;font-weight:600;cursor:pointer;}
   .fav-limpiar:hover{background:var(--surface-2);}
 
+  /* ---- Auditoría ---- */
+  .aud-resumen{display:flex;flex-wrap:wrap;gap:10px;margin:4px 0 14px;}
+  .aud-chip{background:var(--surface-2);border:1px solid var(--border);border-radius:9px;padding:8px 12px;
+    font-size:12.5px;font-weight:600;color:var(--ink-soft);}
+  .aud-chip b{font-family:var(--font-mono);color:var(--ink);font-size:14px;}
+  .aud-chip.ok{background:var(--success-bg);border-color:#BFE0CD;color:var(--success);}
+  .aud-chip.ok b{color:var(--success);}
+  .aud-chip.pend{background:var(--warn-bg);border-color:#E8D9B0;color:var(--warn);}
+  .aud-chip.pend b{color:var(--warn);}
+  .aud-filtros{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:14px;align-items:flex-end;}
+  .aud-f-item{display:flex;flex-direction:column;gap:4px;}
+  .aud-f-item label{font-size:11px;font-weight:600;color:var(--ink-soft);}
+  .aud-f-item input,.aud-f-item select{border:1px solid var(--border);border-radius:8px;padding:8px 10px;
+    font-size:13px;font-family:var(--font-ui);background:var(--surface-2);color:var(--ink);min-width:120px;}
+  .aud-f-item input:focus,.aud-f-item select:focus{outline:none;border-color:var(--blue);background:var(--surface);}
+  .aud-tabla-scroll{overflow-x:auto;border:1px solid var(--border);border-radius:10px;}
+  .aud-tabla{width:100%;border-collapse:collapse;font-size:12.5px;min-width:820px;}
+  .aud-tabla thead th{position:sticky;top:0;background:var(--blue-dark);color:#fff;text-align:left;
+    padding:9px 10px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;white-space:nowrap;}
+  .aud-tabla th.aud-sort{cursor:pointer;user-select:none;}
+  .aud-tabla th.aud-sort:hover{background:var(--blue);}
+  .aud-tabla th.aud-sort .arr{opacity:.5;font-size:10px;margin-left:3px;}
+  .aud-tabla th.aud-sort.activo .arr{opacity:1;}
+  .aud-col-num{text-align:right;}
+  .aud-col-chk{width:36px;text-align:center;}
+  .aud-tabla tbody td{padding:8px 10px;border-top:1px solid var(--border);vertical-align:top;}
+  .aud-tabla tbody tr:nth-child(even){background:var(--surface-2);}
+  .aud-tabla tbody tr.aud-verif{background:var(--success-bg);}
+  .aud-tabla tbody tr.aud-verif:nth-child(even){background:#D7EADF;}
+  .aud-td-desc{max-width:260px;}
+  .aud-td-num{text-align:right;font-family:var(--font-mono);white-space:nowrap;}
+  .aud-tipo-badge{display:inline-block;padding:2px 7px;border-radius:999px;font-size:10.5px;font-weight:700;white-space:nowrap;}
+  .aud-tipo-ingreso{background:var(--ingreso-bg);color:var(--ingreso);}
+  .aud-tipo-egreso{background:var(--egreso-bg);color:var(--egreso);}
+  .aud-tipo-otro{background:var(--surface-2);color:var(--ink-soft);}
+  .aud-chk{width:18px;height:18px;cursor:pointer;accent-color:var(--success);}
+  .aud-verif-info{font-size:10.5px;color:var(--ink-faint);margin-top:2px;line-height:1.2;}
+
   /* ---- Grupo de fecha ---- */
   .fecha-group{border:1px solid var(--border);border-radius:10px;margin-bottom:10px;overflow:hidden;}
   .fecha-group summary{list-style:none;cursor:pointer;padding:13px 14px;display:flex;align-items:center;
@@ -853,6 +891,7 @@
     <div class="tabs">
       <button class="tab active" data-tab="flujo">Flujo de Caja</button>
       <button class="tab" data-tab="analisis">Análisis</button>
+      <button class="tab" data-tab="auditoria">Auditoría</button>
       <button class="tab" data-tab="arqueo">Arqueo</button>
       <button class="tab" data-tab="ordenes">Órdenes</button>
       <button class="tab" data-tab="solicitudes" id="tabBtnSolicitudes" style="display:none;position:relative;">Solicitudes<span class="solic-badge-tab" id="solicBadge" style="display:none;"></span></button>
@@ -1330,6 +1369,79 @@
         </div>
       </div>
       <div id="solicCajeroLista"></div>
+    </div>
+  </div>
+  </div>
+
+  <!-- ===== Pestaña: Auditoría (tabla de movimientos, ordenar/filtrar/marcar físico) ===== -->
+  <div id="tab-auditoria" class="tab-panel">
+  <div class="wrap">
+    <div class="panel">
+      <h2>Auditoría de movimientos</h2>
+      <p class="ahint">Revisa cada movimiento contra el registro firmado en físico y márcalo al confirmarlo. Toca los encabezados para ordenar.</p>
+
+      <!-- Resumen de verificación -->
+      <div class="aud-resumen" id="audResumen"></div>
+
+      <!-- Filtros -->
+      <div class="aud-filtros">
+        <div class="aud-f-item">
+          <label>Buscar</label>
+          <input type="text" id="audBuscar" placeholder="Descripción, persona...">
+        </div>
+        <div class="aud-f-item">
+          <label>Tipo</label>
+          <select id="audTipo">
+            <option value="">Todos</option>
+            <option value="ingreso">Ingresos</option>
+            <option value="egreso">Egresos</option>
+            <option value="pendiente">Pendientes</option>
+            <option value="pendiente_banco">Pend. banco</option>
+          </select>
+        </div>
+        <div class="aud-f-item">
+          <label>Categoría</label>
+          <select id="audCategoria"><option value="">Todas</option></select>
+        </div>
+        <div class="aud-f-item">
+          <label>Verificación</label>
+          <select id="audVerif">
+            <option value="">Todos</option>
+            <option value="si">Verificados</option>
+            <option value="no">Sin verificar</option>
+          </select>
+        </div>
+        <div class="aud-f-item">
+          <label>Desde</label>
+          <input type="date" id="audDesde">
+        </div>
+        <div class="aud-f-item">
+          <label>Hasta</label>
+          <input type="date" id="audHasta">
+        </div>
+        <button type="button" class="fav-limpiar" id="audLimpiar" style="align-self:flex-end;width:auto;padding:9px 14px;">Limpiar</button>
+      </div>
+
+      <div class="aud-tabla-scroll">
+        <table class="aud-tabla" id="audTabla">
+          <thead>
+            <tr>
+              <th class="aud-col-chk"><input type="checkbox" id="audCheckAll" title="Marcar/desmarcar los visibles"></th>
+              <th class="aud-sort" data-sort="fecha">Fecha</th>
+              <th class="aud-sort" data-sort="tipo">Tipo</th>
+              <th class="aud-sort" data-sort="descripcion">Descripción</th>
+              <th class="aud-sort" data-sort="categoria">Categoría</th>
+              <th class="aud-sort" data-sort="responsable">Entrega</th>
+              <th class="aud-sort" data-sort="entregadoA">Recibe</th>
+              <th class="aud-sort aud-col-num" data-sort="monto">Monto</th>
+              <th class="aud-sort aud-col-num" data-sort="d500">L500</th>
+              <th class="aud-sort" data-sort="verificado">Verificado</th>
+            </tr>
+          </thead>
+          <tbody id="audTbody"></tbody>
+        </table>
+      </div>
+      <div id="audVacio" class="empty-state" style="display:none;">Sin movimientos para este filtro.</div>
     </div>
   </div>
   </div>
@@ -1915,7 +2027,10 @@ function movDesdeBD(r){
     origenPendiente: String(r.origen_pendiente||""),
     esExterno: !!r.es_externo,
     cambioDe: Array.isArray(r.cambio_de) ? r.cambio_de.map(String) : [],
-    categoria: String(r.categoria||"Otros")
+    categoria: String(r.categoria||"Otros"),
+    verificadoFisico: !!r.verificado_fisico,
+    verificadoPor: String(r.verificado_por||""),
+    verificadoEn: r.verificado_en||null
   };
 }
 // Construye el payload snake para insertar/actualizar un movimiento
@@ -2011,6 +2126,10 @@ function apiReal(action, data){
     case "addMovimiento":      return sbInsert("caja_movimientos", movHaciaBD(data), true, data);
     case "updateMovimiento":   return sbUpdate("caja_movimientos", data.id, movHaciaBD(data));
     case "deleteMovimiento":   return sbDelete("caja_movimientos", data.id);
+    case "setVerificado":      return sbUpdate("caja_movimientos", data.id, {
+                                   verificado_fisico: !!data.verificado,
+                                   verificado_por: data.verificado ? (data.verificadoPor||"") : null,
+                                   verificado_en: data.verificado ? new Date().toISOString() : null });
     case "addArqueo":          return sbAddArqueo(data);
     case "updateArqueoFirmas": return sbUpdate("caja_arqueos", data.id, {
                                    firma_responsable: data.firmaResponsable||"",
@@ -2217,7 +2336,7 @@ function sbTraerTodo(construirConsulta){
 // ---- getData: lee todo lo que el cajero necesita ----
 function sbGetData(){
   return Promise.all([
-    sbTraerTodo(function(){ return sb.from("caja_movimientos").select("id,fecha,tipo,responsable,entregado_a,descripcion,monto,d500,d200,d100,d50,d20,d10,d5,d2,d1,es_pendiente,origen_pendiente,es_externo,cambio_de,categoria,tiene_firma_entrega,tiene_firma_recibe").order("fecha",{ascending:false}); }),
+    sbTraerTodo(function(){ return sb.from("caja_movimientos").select("id,fecha,tipo,responsable,entregado_a,descripcion,monto,d500,d200,d100,d50,d20,d10,d5,d2,d1,es_pendiente,origen_pendiente,es_externo,cambio_de,categoria,tiene_firma_entrega,tiene_firma_recibe,verificado_fisico,verificado_por,verificado_en").order("fecha",{ascending:false}); }),
     sb.from("caja_arqueos").select("id,fecha,hora,responsable,verificador,total_contado,efectivo_pendiente,teorico,sistema,excel,diferencia,notas,denominaciones,pendientes_lista,creado_en,tiene_firma_responsable,tiene_firma_verificador").order("creado_en",{ascending:false}),
     sb.from("caja_ordenes").select("id,fecha,descripcion,monto,recibe,autorizador,estado,movimiento_id,creado_en,tiene_firma_autoriza").order("creado_en",{ascending:false}),
     sb.from("caja_personas").select("nombre").order("nombre"),
@@ -4875,8 +4994,171 @@ document.querySelectorAll(".tab[data-tab]").forEach(function(btn){
     if(btn.getAttribute("data-tab")==="ordenes"){ ordPrepararNueva(); }
     if(btn.getAttribute("data-tab")==="solicitudes"){ if(typeof renderSolicitudesCajero==="function") renderSolicitudesCajero(); }
     if(btn.getAttribute("data-tab")==="analisis"){ if(typeof renderAnalisis==="function") renderAnalisis(); }
+    if(btn.getAttribute("data-tab")==="auditoria"){ if(typeof renderAuditoria==="function") renderAuditoria(); }
   });
 });
+
+// ================================================================
+// Pestaña Auditoría: tabla de movimientos ordenable/filtrable + marcar físico
+// ================================================================
+var audSort={campo:"fecha", dir:"desc"};
+function audValorOrden(m, campo){
+  switch(campo){
+    case "fecha": return new Date(m.fecha).getTime()||0;
+    case "monto": return m.monto||0;
+    case "d500": return (m.denominaciones&&m.denominaciones[500])||0;
+    case "verificado": return m.verificadoFisico?1:0;
+    case "descripcion": return (m.descripcion||"").toLowerCase();
+    case "tipo": return (m.tipo||"").toLowerCase();
+    case "categoria": return (m.categoria||"").toLowerCase();
+    case "responsable": return (m.responsable||"").toLowerCase();
+    case "entregadoA": return (m.entregadoA||"").toLowerCase();
+    default: return "";
+  }
+}
+function audFiltrar(){
+  var q=(document.getElementById("audBuscar").value||"").trim().toLowerCase();
+  var tipo=document.getElementById("audTipo").value;
+  var cat=document.getElementById("audCategoria").value;
+  var verif=document.getElementById("audVerif").value;
+  var desde=document.getElementById("audDesde").value;
+  var hasta=document.getElementById("audHasta").value;
+  return (state.movimientos||[]).filter(function(m){
+    if(tipo && m.tipo!==tipo) return false;
+    if(cat && (m.categoria||"Otros")!==cat) return false;
+    if(verif==="si" && !m.verificadoFisico) return false;
+    if(verif==="no" && m.verificadoFisico) return false;
+    if(desde && fechaKey(m.fecha)<desde) return false;
+    if(hasta && fechaKey(m.fecha)>hasta) return false;
+    if(q){
+      var blob=((m.descripcion||"")+" "+(m.responsable||"")+" "+(m.entregadoA||"")+" "+(m.categoria||"")).toLowerCase();
+      if(blob.indexOf(q)===-1) return false;
+    }
+    return true;
+  });
+}
+function renderAuditoria(){
+  var tbody=document.getElementById("audTbody"); if(!tbody) return;
+  // poblar categorías del filtro (una vez / al cambiar)
+  var selCat=document.getElementById("audCategoria");
+  if(selCat){
+    var prev=selCat.value;
+    selCat.innerHTML='<option value="">Todas</option>'+nombresCategorias().map(function(c){ return '<option value="'+esc(c)+'">'+esc(c)+'</option>'; }).join("");
+    if(prev && nombresCategorias().indexOf(prev)!==-1) selCat.value=prev;
+  }
+  var lista=audFiltrar();
+  // ordenar
+  var dir=audSort.dir==="asc"?1:-1;
+  lista.sort(function(a,b){
+    var va=audValorOrden(a,audSort.campo), vb=audValorOrden(b,audSort.campo);
+    if(va<vb) return -1*dir; if(va>vb) return 1*dir; return 0;
+  });
+  // encabezados: marcar el activo con flecha
+  document.querySelectorAll("#audTabla th.aud-sort").forEach(function(th){
+    th.classList.remove("activo");
+    var base=th.getAttribute("data-sort");
+    var txt=th.textContent.replace(/[▲▼].*$/,"").trim();
+    if(base===audSort.campo){ th.classList.add("activo"); txt+=' <span class="arr">'+(audSort.dir==="asc"?"▲":"▼")+'</span>'; }
+    else { txt+=' <span class="arr">↕</span>'; }
+    th.innerHTML=txt;
+  });
+  // resumen
+  var total=lista.length, verif=lista.filter(function(m){return m.verificadoFisico;}).length;
+  var res=document.getElementById("audResumen");
+  if(res){
+    res.innerHTML='<div class="aud-chip">Movimientos <b>'+total+'</b></div>'+
+      '<div class="aud-chip ok">Verificados <b>'+verif+'</b></div>'+
+      '<div class="aud-chip pend">Por verificar <b>'+(total-verif)+'</b></div>';
+  }
+  // filas
+  if(!lista.length){
+    tbody.innerHTML=""; document.getElementById("audVacio").style.display="block";
+    document.getElementById("audCheckAll").checked=false;
+    return;
+  }
+  document.getElementById("audVacio").style.display="none";
+  tbody.innerHTML=lista.map(function(m){
+    var fd=parseFechaISO(m.fecha);
+    var fechaTxt=pad(fd.getDate())+"/"+pad(fd.getMonth()+1)+"/"+String(fd.getFullYear()).slice(2)+" "+pad(fd.getHours())+":"+pad(fd.getMinutes());
+    var tipoClase=m.tipo==="ingreso"?"aud-tipo-ingreso":(m.tipo==="egreso"?"aud-tipo-egreso":"aud-tipo-otro");
+    var tipoTxt=m.tipo==="pendiente_banco"?"pend.banco":m.tipo;
+    var d500=(m.denominaciones&&m.denominaciones[500])||0;
+    var info="";
+    if(m.verificadoFisico && (m.verificadoPor||m.verificadoEn)){
+      var ve=m.verificadoEn?parseFechaISO(m.verificadoEn):null;
+      var veTxt=ve?(pad(ve.getDate())+"/"+pad(ve.getMonth()+1)):"";
+      info='<div class="aud-verif-info">'+esc(m.verificadoPor||"")+(veTxt?" · "+veTxt:"")+'</div>';
+    }
+    return '<tr class="'+(m.verificadoFisico?"aud-verif":"")+'" data-id="'+esc(m.id)+'">'+
+      '<td class="aud-col-chk"><input type="checkbox" class="aud-chk" data-id="'+esc(m.id)+'"'+(m.verificadoFisico?" checked":"")+'></td>'+
+      '<td class="aud-td-num">'+fechaTxt+'</td>'+
+      '<td><span class="aud-tipo-badge '+tipoClase+'">'+esc(tipoTxt)+'</span></td>'+
+      '<td class="aud-td-desc">'+esc(m.descripcion||"")+'</td>'+
+      '<td>'+esc(m.categoria||"Otros")+'</td>'+
+      '<td>'+esc(m.responsable||"—")+'</td>'+
+      '<td>'+esc(m.entregadoA||"—")+'</td>'+
+      '<td class="aud-td-num">'+fmt(m.monto)+'</td>'+
+      '<td class="aud-td-num">'+(d500||"")+'</td>'+
+      '<td>'+(m.verificadoFisico?"✓":"")+info+'</td>'+
+    '</tr>';
+  }).join("");
+  // estado del checkbox "marcar todos"
+  var allChk=document.getElementById("audCheckAll");
+  if(allChk) allChk.checked = lista.length>0 && lista.every(function(m){ return m.verificadoFisico; });
+}
+function audSetVerificado(id, verificado){
+  var m=state.movimientos.filter(function(x){ return String(x.id)===String(id); })[0];
+  if(!m) return Promise.resolve();
+  m.verificadoFisico=verificado;
+  m.verificadoPor=verificado?nombreCajero():"";
+  m.verificadoEn=verificado?new Date().toISOString():null;
+  return api("setVerificado",{ id:id, verificado:verificado, verificadoPor:nombreCajero() })
+    .catch(function(err){ setSyncState("err","No se pudo guardar: "+err.message); });
+}
+(function(){
+  var tbody=document.getElementById("audTbody"); if(!tbody) return;
+  // marcar una fila
+  tbody.addEventListener("change", function(e){
+    var chk=e.target.closest(".aud-chk"); if(!chk) return;
+    audSetVerificado(chk.getAttribute("data-id"), chk.checked).then(function(){ renderAuditoria(); });
+  });
+  // marcar/desmarcar todos los visibles
+  var allChk=document.getElementById("audCheckAll");
+  if(allChk) allChk.addEventListener("change", function(){
+    var marcar=allChk.checked;
+    var visibles=audFiltrar();
+    var cambios=visibles.filter(function(m){ return m.verificadoFisico!==marcar; });
+    if(!cambios.length){ renderAuditoria(); return; }
+    setSyncState("syncing","Guardando verificación...");
+    Promise.all(cambios.map(function(m){ return audSetVerificado(m.id, marcar); })).then(function(){
+      setSyncState("ok","Verificación actualizada"); renderAuditoria();
+    });
+  });
+  // ordenar por encabezado
+  document.querySelectorAll("#audTabla th.aud-sort").forEach(function(th){
+    th.addEventListener("click", function(){
+      var campo=th.getAttribute("data-sort");
+      if(audSort.campo===campo){ audSort.dir=(audSort.dir==="asc"?"desc":"asc"); }
+      else { audSort.campo=campo; audSort.dir=(campo==="descripcion"||campo==="categoria"||campo==="responsable"||campo==="entregadoA"||campo==="tipo")?"asc":"desc"; }
+      renderAuditoria();
+    });
+  });
+  // filtros
+  ["audBuscar","audTipo","audCategoria","audVerif","audDesde","audHasta"].forEach(function(id){
+    var el=document.getElementById(id); if(!el) return;
+    el.addEventListener(id==="audBuscar"?"input":"change", renderAuditoria);
+  });
+  var limp=document.getElementById("audLimpiar");
+  if(limp) limp.addEventListener("click", function(){
+    document.getElementById("audBuscar").value="";
+    document.getElementById("audTipo").value="";
+    document.getElementById("audCategoria").value="";
+    document.getElementById("audVerif").value="";
+    document.getElementById("audDesde").value="";
+    document.getElementById("audHasta").value="";
+    renderAuditoria();
+  });
+})();
 
 // ================================================================
 // Análisis / dashboard (se calcula en vivo desde state)
