@@ -880,6 +880,9 @@
         <span id="usuarioNombre" style="font-size:12.5px;color:var(--ink-soft);font-weight:600;margin-right:4px;"></span>
         <div class="offline-badge" id="offlineBadge" style="display:none;" title="Estado de conexión"></div>
         <div class="sync-badge" id="syncBadge" style="display:none;"></div>
+        <button class="btn-icon" id="gavetaBtn" title="Conectar gaveta de dinero" style="display:none;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="9" rx="1.5"/><path d="M5 11V6a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v5"/><path d="M10 15.5h4"/></svg>
+        </button>
         <button class="btn-icon" id="recargarBtn" title="Recargar datos">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/></svg>
         </button>
@@ -2521,6 +2524,8 @@ function existeEnServidor(tipo, id){ return Promise.resolve(false); }
 function apiGuardarMovimiento(accion, mov){
   return api(accion, mov).then(function(res){
     if(accion==="addMovimiento" && res && res.id){ mov.id = String(res.id); }
+    // Abrir la gaveta en todo movimiento nuevo de caja (los de banco no tocan efectivo)
+    if(accion==="addMovimiento" && mov.tipo!=="pendiente_banco"){ gavetaAbrir(); }
     return res;
   });
 }
@@ -2530,6 +2535,76 @@ function apiGuardarOrden(accion, orden){
     return res;
   });
 }
+
+// ================================================================
+// Gaveta de dinero (3nStar CD350 vía disparador USB, Web Serial)
+// Solo Chrome/Edge de escritorio. El permiso del puerto queda guardado
+// en el navegador, así que basta con conectar una vez.
+// ================================================================
+var GAVETA_CMD = new Uint8Array([0x1B,0x70,0x00,0x19,0xFA]); // ESC p 0 25 250 (pulso de apertura)
+var _gavetaPort = null, _gavetaUltima = 0;
+
+function gavetaSoportada(){ return ("serial" in navigator); }
+
+function gavetaActualizarBtn(){
+  var b=document.getElementById("gavetaBtn"); if(!b) return;
+  if(!gavetaSoportada()){ b.style.display="none"; return; }
+  b.style.display="";
+  b.style.color = _gavetaPort ? "var(--ingreso)" : "";
+  b.style.borderColor = _gavetaPort ? "var(--ingreso)" : "";
+  b.title = _gavetaPort ? "Abrir gaveta" : "Conectar gaveta de dinero";
+}
+
+function gavetaUsarPuerto(port){
+  if(port.readable || port.writable){ _gavetaPort=port; gavetaActualizarBtn(); return Promise.resolve(port); }
+  return port.open({ baudRate:9600 }).then(function(){
+    _gavetaPort=port; gavetaActualizarBtn(); return port;
+  });
+}
+
+// Reconectar sola al cargar si el navegador ya tiene permiso del puerto
+function gavetaIniciar(){
+  gavetaActualizarBtn();
+  if(!gavetaSoportada()) return;
+  navigator.serial.getPorts().then(function(ports){
+    if(ports.length) return gavetaUsarPuerto(ports[0]);
+  }).catch(function(e){ console.warn("Gaveta no disponible:", e.message); });
+  navigator.serial.addEventListener("disconnect", function(e){
+    if(e.target===_gavetaPort){ _gavetaPort=null; gavetaActualizarBtn(); }
+  });
+  navigator.serial.addEventListener("connect", function(e){
+    if(!_gavetaPort) gavetaUsarPuerto(e.target).catch(function(){});
+  });
+}
+
+// Requiere un clic del usuario (lo exige el navegador para elegir el puerto)
+function gavetaConectar(){
+  return navigator.serial.requestPort().then(gavetaUsarPuerto).then(function(){
+    setSyncState("ok","Gaveta conectada");
+  }).catch(function(e){
+    if(e && e.name==="NotFoundError") return; // el usuario canceló
+    setSyncState("err","No se pudo conectar la gaveta: "+e.message);
+  });
+}
+
+function gavetaAbrir(){
+  if(!_gavetaPort || !_gavetaPort.writable) return Promise.resolve(false);
+  var ahora=Date.now();
+  if(ahora-_gavetaUltima<2000) return Promise.resolve(false); // p.ej. un cambio guarda 2 movimientos seguidos
+  _gavetaUltima=ahora;
+  var w=_gavetaPort.writable.getWriter();
+  return w.write(GAVETA_CMD).then(function(){ return true; }).catch(function(e){
+    console.warn("No se pudo abrir la gaveta:", e.message); return false;
+  }).finally(function(){ w.releaseLock(); });
+}
+
+(function(){
+  var b=document.getElementById("gavetaBtn");
+  if(b) b.addEventListener("click", function(){
+    if(_gavetaPort){ _gavetaUltima=0; gavetaAbrir(); } else { gavetaConectar(); }
+  });
+  gavetaIniciar();
+})();
 
 // ================================================================
 // Pantallas
