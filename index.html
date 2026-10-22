@@ -457,6 +457,88 @@
   .mov-item.pendiente .mov-icon{background:#EBD9AE;color:var(--warn);}
   .mov-item.pendiente .mov-amount{color:var(--warn);}
   .mov-saldo{font-family:var(--font-mono);font-size:11px;color:var(--ink-faint);white-space:nowrap;margin-top:2px;}
+  /* ---- Bloqueo con PIN / huella ---- */
+  #lockScreen{position:fixed;inset:0;z-index:1000;background:var(--blue-dark);display:none;align-items:center;justify-content:center;
+    padding:24px 16px;overflow-y:auto;}
+  #lockScreen.visible{display:flex;}
+  body.bloqueada{overflow:hidden;}
+  .lock-box{width:100%;max-width:320px;text-align:center;color:#fff;}
+  .lock-logo{width:64px;height:64px;border-radius:16px;display:block;margin:0 auto 14px;}
+  .lock-titulo{font-family:var(--font-d);font-weight:600;font-size:22px;margin:0;}
+  .lock-sub{margin:4px 0 18px;font-size:13px;color:rgba(255,255,255,.7);}
+  .lock-dots{display:flex;justify-content:center;gap:16px;margin-bottom:10px;}
+  .lock-dots span{width:14px;height:14px;border-radius:50%;border:2px solid rgba(255,255,255,.75);}
+  .lock-dots span.lleno{background:#fff;border-color:#fff;}
+  .lock-dots.error{animation:lockSacudir .35s;}
+  @keyframes lockSacudir{0%,100%{transform:translateX(0);}25%{transform:translateX(-8px);}75%{transform:translateX(8px);}}
+  .lock-error{min-height:20px;font-size:13px;font-weight:600;color:#F5A9A0;margin-bottom:8px;}
+  .lock-pad{display:grid;grid-template-columns:repeat(3,72px);gap:14px 22px;justify-content:center;margin-bottom:16px;}
+  .lock-pad button{width:72px;height:72px;border-radius:50%;border:none;background:rgba(255,255,255,.12);color:#fff;
+    font-family:var(--font-ui);font-size:26px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;
+    -webkit-tap-highlight-color:transparent;}
+  .lock-pad button:active{background:rgba(255,255,255,.3);}
+  .lock-pad button.lock-tecla-sec{background:transparent;}
+  .lock-pad button.lock-tecla-sec svg{width:28px;height:28px;}
+  .lock-pad button.oculto{visibility:hidden;}
+  .lock-link{background:none;border:none;color:rgba(255,255,255,.75);font-family:var(--font-ui);font-size:13px;cursor:pointer;
+    text-decoration:underline;padding:8px;display:block;margin:0 auto;}
+  .lock-config-estado{font-size:13px;color:var(--ink-soft);margin-bottom:8px;}
+  .lock-config-btns{display:flex;gap:8px;flex-wrap:wrap;}
+  .lock-config-btns .btn{flex:1;min-width:130px;}
+
+  /* ---- Registro rápido (POS) ---- */
+  .pos-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:14px;}
+  .pos-title{font-family:var(--font-d);font-weight:600;font-size:19px;margin:0;}
+  .pos-sub{margin:2px 0 0;font-size:12.5px;color:var(--ink-faint);}
+  .pos-editar-btn{padding:8px 14px;font-size:13px;flex-shrink:0;}
+  .pos-editar-btn.activo{background:var(--blue-dark);color:#fff;border-color:var(--blue-dark);}
+  .pos-grupos{display:flex;gap:8px;overflow-x:auto;padding-bottom:6px;margin-bottom:12px;-webkit-overflow-scrolling:touch;}
+  .pos-chip{flex-shrink:0;display:inline-flex;align-items:center;gap:7px;border:1.5px solid var(--border);background:var(--surface-2);
+    color:var(--ink);border-radius:999px;padding:9px 16px;font-family:var(--font-ui);font-weight:600;font-size:14px;cursor:pointer;}
+  .pos-chip .cat-dot{width:9px;height:9px;border-radius:50%;display:inline-block;}
+  .pos-chip.activo{background:var(--blue-dark);border-color:var(--blue-dark);color:#fff;}
+  .pos-chip.nuevo{border-style:dashed;background:transparent;color:var(--blue);}
+  .pos-grupo-acciones{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;}
+  .pos-grupo-acciones .btn{padding:7px 13px;font-size:12.5px;}
+  .pos-btn-danger{color:var(--danger);}
+  .pos-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;}
+  .pos-item{position:relative;text-align:left;border:1.5px solid var(--border);border-left-width:5px;border-radius:12px;background:var(--surface);
+    padding:14px 12px;min-height:92px;cursor:pointer;font-family:var(--font-ui);color:var(--ink);display:flex;flex-direction:column;gap:6px;
+    transition:transform .08s, background .12s;}
+  .pos-item:active{transform:scale(.97);}
+  .pos-item:hover{background:var(--surface-2);}
+  .pos-item.ingreso{border-left-color:var(--ingreso);}
+  .pos-item.egreso{border-left-color:var(--egreso);}
+  .pos-item .pi-nombre{font-weight:700;font-size:15px;line-height:1.25;}
+  .pos-item .pi-monto{font-family:var(--font-mono);font-weight:700;font-size:15px;margin-top:auto;}
+  .pos-item.ingreso .pi-monto{color:var(--ingreso);}
+  .pos-item.egreso .pi-monto{color:var(--egreso);}
+  .pos-item .pi-monto.libre{font-family:var(--font-ui);font-weight:600;font-size:12.5px;color:var(--ink-faint);}
+  .pos-item .pi-meta{font-size:11.5px;color:var(--ink-faint);}
+  .pos-item .pi-edit{position:absolute;top:8px;right:8px;font-size:11px;font-weight:700;color:var(--blue);background:var(--blue-bg);border-radius:999px;padding:2px 8px;}
+  .pos-item.agregar{border-style:dashed;border-left-width:1.5px;align-items:center;justify-content:center;color:var(--blue);font-weight:700;background:transparent;}
+  @media(max-width:600px){ .pos-grid{grid-template-columns:repeat(2,minmax(0,1fr));} .pos-item{min-height:100px;} }
+  .mov-badges{display:flex;flex-wrap:wrap;gap:4px;margin:3px 0 2px;}
+  .mov-badges .pend-badge,.mov-badges .cambio-badge{margin-left:0;}
+  /* Móvil: tarjeta más alta, descripción completa y datos en filas */
+  @media(max-width:600px){
+    .mov-item{display:grid;grid-template-columns:34px minmax(0,1fr) auto;
+      grid-template-areas:"icon desc desc" "icon badges badges" "icon quien quien" "act cat amount" "act cat saldo";
+      column-gap:10px;row-gap:5px;padding:13px 12px;align-items:center;}
+    .mov-item .mov-main,.mov-item .mov-right,.mov-item .mov-meta{display:contents;}
+    .mov-icon{grid-area:icon;align-self:start;width:34px;height:34px;}
+    .mov-desc{grid-area:desc;white-space:normal;font-size:15px;line-height:1.3;
+      display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;}
+    .mov-badges{grid-area:badges;margin:0;}
+    .mov-quien{grid-area:quien;font-size:12.5px;color:var(--ink-soft);white-space:normal;line-height:1.3;}
+    .mov-cat-tag{grid-area:cat;justify-self:start;margin-left:0;font-size:11.5px;}
+    .mov-amount{grid-area:amount;font-size:16px;text-align:right;}
+    .mov-saldo{grid-area:saldo;text-align:right;margin-top:0;}
+    .mov-pasar{grid-area:act;justify-self:center;}
+    .mov-chevron{display:none;}
+    .mes-dias{padding:8px 6px;}
+    .fecha-movs{padding:8px 6px;}
+  }
   .mov-detail{padding:0 12px 12px 52px;border-top:1px dashed var(--border);}
   .mov-detail-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(64px,1fr));gap:6px;margin:10px 0;}
   .mov-detail-chip{background:var(--surface-2);border-radius:6px;padding:5px 6px;text-align:center;
@@ -899,6 +981,7 @@
   <div class="tabs-bar">
     <div class="tabs">
       <button class="tab active" data-tab="flujo">Flujo de Caja</button>
+      <button class="tab" data-tab="rapido">Rápido</button>
       <button class="tab" data-tab="analisis">Análisis</button>
       <button class="tab" data-tab="auditoria">Auditoría</button>
       <button class="tab" data-tab="arqueo">Arqueo</button>
@@ -1069,6 +1152,24 @@
   </div>
 
   <!-- ===== TAB ANÁLISIS ===== -->
+  <div id="tab-rapido" class="tab-panel">
+    <div class="panel">
+      <div class="pos-head">
+        <div>
+          <h2 class="pos-title">Registro rápido</h2>
+          <p class="pos-sub" id="posSub">Toca un botón para registrar el movimiento ya lleno.</p>
+        </div>
+        <button type="button" class="btn btn-ghost pos-editar-btn" id="posEditarBtn">Editar botones</button>
+      </div>
+      <div class="pos-grupos" id="posGrupos"></div>
+      <div class="pos-grupo-acciones" id="posGrupoAcciones" style="display:none;">
+        <button type="button" class="btn btn-ghost" id="posRenombrarGrupo">Renombrar grupo</button>
+        <button type="button" class="btn btn-ghost pos-btn-danger" id="posEliminarGrupo">Eliminar grupo</button>
+      </div>
+      <div class="pos-grid" id="posGrid"></div>
+    </div>
+  </div>
+
   <div id="tab-analisis" class="tab-panel">
   <div class="wrap">
     <div class="an-head">
@@ -1815,6 +1916,57 @@
   </div>
 </div>
 
+<!-- Pantalla de bloqueo (PIN / huella) -->
+<div id="lockScreen" aria-hidden="true">
+  <div class="lock-box">
+    <img src="icon-192.png" alt="" class="lock-logo">
+    <h2 class="lock-titulo" id="lockTitulo">Ingresa tu PIN</h2>
+    <p class="lock-sub" id="lockSub">Mi Caja está bloqueada</p>
+    <div class="lock-dots" id="lockDots"><span></span><span></span><span></span><span></span></div>
+    <div class="lock-error" id="lockError"></div>
+    <div class="lock-pad" id="lockPad">
+      <button type="button" data-k="1">1</button><button type="button" data-k="2">2</button><button type="button" data-k="3">3</button>
+      <button type="button" data-k="4">4</button><button type="button" data-k="5">5</button><button type="button" data-k="6">6</button>
+      <button type="button" data-k="7">7</button><button type="button" data-k="8">8</button><button type="button" data-k="9">9</button>
+      <button type="button" data-k="huella" class="lock-tecla-sec" id="lockHuellaTecla" title="Usar huella">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 11v3a8 8 0 0 1-1.5 4.7"/><path d="M8.5 13a3.5 3.5 0 0 1 7 0v1a12 12 0 0 1-.8 4.3"/><path d="M5.5 15.5A9 9 0 0 0 6 13a6 6 0 0 1 9.5-4.9"/><path d="M18.4 10.5A6 6 0 0 1 18.5 13v1a16 16 0 0 1-.4 3.5"/><path d="M4 9.5A9 9 0 0 1 20.5 9"/></svg>
+      </button>
+      <button type="button" data-k="0">0</button>
+      <button type="button" data-k="borrar" class="lock-tecla-sec" title="Borrar">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 5H9l-6 7 6 7h12a1 1 0 0 0 1-1V6a1 1 0 0 0-1-1Z"/><line x1="17" y1="9" x2="12" y2="14"/><line x1="12" y1="9" x2="17" y2="14"/></svg>
+      </button>
+    </div>
+    <button type="button" class="lock-link" id="lockOlvide">¿Olvidaste tu PIN? Cerrar sesión</button>
+    <button type="button" class="lock-link" id="lockCancelar" style="display:none;">Cancelar</button>
+  </div>
+</div>
+
+<!-- Modal editor de botón rápido -->
+<div class="modal-overlay" id="posItemOverlay">
+  <div class="modal-card">
+    <div class="modal-header">
+      <h2 id="posItemTitulo">Nuevo botón</h2>
+      <button type="button" class="modal-close" id="posItemClose">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <form id="posItemForm" novalidate>
+      <div class="tipo-toggle">
+        <button type="button" class="tipo-btn active" data-tipo="ingreso">Ingreso</button>
+        <button type="button" class="tipo-btn" data-tipo="egreso">Egreso</button>
+      </div>
+      <div class="field"><label for="posNombre">Nombre del botón (será la descripción)</label><input type="text" id="posNombre" maxlength="80" placeholder="Ej. Pago de agua"></div>
+      <div class="field"><label for="posMonto">Monto fijo (opcional)</label><input type="text" inputmode="decimal" class="expr-input" id="posMonto" placeholder="Vacío = se escribe al registrar"></div>
+      <div class="field"><label for="posPersona" id="posPersonaLabel">Quién entrega (opcional)</label><select id="posPersona"></select></div>
+      <div class="field"><label for="posCategoria">Categoría</label><select id="posCategoria"></select></div>
+      <div class="field"><label for="posGrupoSel">Grupo</label><select id="posGrupoSel"></select></div>
+      <div class="form-error" id="posItemError" style="display:none;"></div>
+      <button type="submit" class="btn-primary" id="posItemGuardar">Guardar botón</button>
+      <button type="button" class="link-danger" id="posItemEliminar" style="display:none;margin-top:12px;">Eliminar este botón</button>
+    </form>
+  </div>
+</div>
+
 <!-- Modal configuración -->
 <div class="modal-overlay" id="configOverlay">
   <div class="modal-card">
@@ -1838,6 +1990,16 @@
       <label>Categorías de movimientos</label>
       <button class="btn btn-ghost" id="abrirCategoriasBtn" style="width:100%;">Administrar categorías</button>
       <div class="desc">Agrega, edita o elimina las categorías, su color y las palabras clave que las auto-detectan.</div>
+    </div>
+    <div class="config-field">
+      <label>Seguridad de este equipo</label>
+      <div class="lock-config-estado" id="lockConfigEstado"></div>
+      <div class="lock-config-btns">
+        <button class="btn btn-ghost" id="lockPinBtn">Configurar PIN</button>
+        <button class="btn btn-ghost" id="lockHuellaBtn" style="display:none;">Activar huella</button>
+        <button class="btn btn-ghost pos-btn-danger" id="lockQuitarBtn" style="display:none;">Quitar PIN</button>
+      </div>
+      <div class="desc">Con PIN, la app se bloquea al abrirla y después de 5 minutos sin uso. Se guarda solo en este equipo.</div>
     </div>
     <div class="config-field">
       <label>Sesión</label>
@@ -2155,6 +2317,8 @@ function apiReal(action, data){
     case "updateCategoria":    return sbUpdate("caja_categorias", data.id, catHaciaBD(data));
     case "deleteCategoria":    return sbDelete("caja_categorias", data.id);
     case "updateConfig":       return sbUpdateConfig(data);
+    case "updatePosRapido":    return sb.from("caja_parametros").upsert({ clave:"posRapido", texto: JSON.stringify(data.posRapido||{grupos:[]}) }, { onConflict:"clave" }).then(function(r){
+                                   sbErr(r.error); return { ok:true }; });
     default: return Promise.reject(new Error("Acción desconocida: "+action));
   }
 }
@@ -2167,7 +2331,7 @@ var OFF_CACHE_KEY = "cajaMasPisto_cache";
 var OFF_QUEUE_KEY = "cajaMasPisto_cola";
 var OFF_ESCRITURAS = { addMovimiento:1, updateMovimiento:1, deleteMovimiento:1,
   addArqueo:1, updateArqueoFirmas:1, deleteArqueo:1, addOrden:1, updateOrden:1, deleteOrden:1,
-  addPersona:1, addEtiqueta:1, deleteEtiqueta:1, updateConfig:1 };
+  addPersona:1, addEtiqueta:1, deleteEtiqueta:1, updateConfig:1, updatePosRapido:1 };
 var _sincronizando = false;
 
 function offLeerCola(){
@@ -2191,6 +2355,7 @@ function offGuardarCache(){
       ts: Date.now(),
       saldoInicial: state.saldoInicial, efectivoPendiente: state.efectivoPendiente,
       saldoExcel: state.saldoExcel, saldoSistema: state.saldoSistema, saldoMinimo: state.saldoMinimo,
+      posRapido: state.posRapido,
       movimientos: state.movimientos, arqueos: state.arqueos, ordenes: state.ordenes,
       personas: state.personas, etiquetas: state.etiquetas, categorias: state.categorias
     }));
@@ -2219,7 +2384,8 @@ function api(action, data){
         var c = offLeerCache();
         if(c){ var copia=Object.assign({ ok:true, _desdeCache:true, config:{
           saldoInicial:c.saldoInicial, efectivoPendiente:c.efectivoPendiente,
-          saldoExcel:c.saldoExcel, saldoSistema:c.saldoSistema, saldoMinimo:c.saldoMinimo
+          saldoExcel:c.saldoExcel, saldoSistema:c.saldoSistema, saldoMinimo:c.saldoMinimo,
+          posRapido:c.posRapido||null
         }}, { movimientos:c.movimientos||[], arqueos:c.arqueos||[], ordenes:c.ordenes||[],
           personas:c.personas||[], etiquetas:c.etiquetas||[], categorias:c.categorias||[] });
           return copia;
@@ -2351,13 +2517,15 @@ function sbGetData(){
     sb.from("caja_ordenes").select("id,fecha,descripcion,monto,recibe,autorizador,estado,movimiento_id,creado_en,tiene_firma_autoriza").order("creado_en",{ascending:false}),
     sb.from("caja_personas").select("nombre").order("nombre"),
     sb.from("caja_etiquetas").select("texto").order("texto"),
-    sb.from("caja_parametros").select("clave,valor"),
+    sb.from("caja_parametros").select("clave,valor,texto"),
     sb.from("caja_categorias").select("id,nombre,color,palabras_clave,orden,protegida").order("orden")
   ]).then(function(res){
     // res[0] ya es un array de filas (sbTraerTodo); el resto son respuestas {data,error}
     res.slice(1).forEach(function(r){ sbErr(r.error); });
-    var cfg = {};
-    (res[5].data||[]).forEach(function(p){ cfg[p.clave] = p.valor; });
+    var cfg = {}, cfgTexto = {};
+    (res[5].data||[]).forEach(function(p){ cfg[p.clave] = p.valor; cfgTexto[p.clave] = p.texto; });
+    var posRapido = null;
+    try{ posRapido = cfgTexto.posRapido ? JSON.parse(cfgTexto.posRapido) : null; }catch(e){ posRapido = null; }
     return {
       ok:true,
       config:{
@@ -2365,7 +2533,8 @@ function sbGetData(){
         efectivoPendiente: Number(cfg.efectivoPendiente)||0,
         saldoExcel: (cfg.saldoExcel==null)?null:Number(cfg.saldoExcel),
         saldoSistema:(cfg.saldoSistema==null)?null:Number(cfg.saldoSistema),
-        saldoMinimo:(cfg.saldoMinimo==null)?null:Number(cfg.saldoMinimo)
+        saldoMinimo:(cfg.saldoMinimo==null)?null:Number(cfg.saldoMinimo),
+        posRapido: posRapido
       },
       movimientos:(res[0]||[]).map(movDesdeBD),
       arqueos:(res[1].data||[]).map(arqDesdeBD),
@@ -2480,7 +2649,7 @@ function sbUpdateConfig(data){
 // ================================================================
 // Estado global + variables de UI (conservadas del original)
 // ================================================================
-var state = { saldoInicial:0, movimientos:[], saldoExcel:null, saldoSistema:null, saldoMinimo:null, efectivoPendiente:0, personas:[], arqueos:[], etiquetas:[], ordenes:[], solicitudes:[], categorias:[] };
+var state = { posRapido:{grupos:[]}, saldoInicial:0, movimientos:[], saldoExcel:null, saldoSistema:null, saldoMinimo:null, efectivoPendiente:0, personas:[], arqueos:[], etiquetas:[], ordenes:[], solicitudes:[], categorias:[] };
 var selectedTipo = "ingreso";
 var filtroTipo = "todos";
 var filtroCategoria = "";
@@ -2590,6 +2759,7 @@ function loadData(silent){
     state.etiquetas         = result.etiquetas||[];
     state.ordenes           = result.ordenes||[];
     state.categorias        = result.categorias||[];
+    state.posRapido         = result.config.posRapido||{grupos:[]};
     hideError(); showApp(); syncInputsFromState(); renderAll();
     poblarFiltroCategoria();
     poblarFiltroPersona();
@@ -2826,6 +2996,7 @@ function renderAll(){
   if(typeof poblarFiltroPersona==="function") poblarFiltroPersona();
   renderEtiquetas();
   if(typeof ordRenderLista==="function") ordRenderLista();
+  if(typeof posRender==="function") posRender();
   // Guardar snapshot offline SOLO si en esta sesión ya hubo una carga
   // confirmada del servidor. Así, si la app abrió mostrando la caché
   // (sin red) o quedó con un estado parcial, nunca se sobrescribe el
@@ -3121,11 +3292,13 @@ function renderHistorialGroups(){
         : '';
       var cat=m.categoria||anCategoria(m.descripcion);
       var catTag='<span class="mov-cat-tag"><span class="cat-dot" style="background:'+colorCategoria(cat)+';"></span>'+esc(cat)+'</span>';
+      var quien=esIngreso ? (m.responsable||"") : (m.entregadoA ? "Para "+m.entregadoA : (m.responsable||""));
       return '<div class="mov-item '+claseTipo+(esPend?" pendiente":"")+'">'+
         '<div class="mov-icon mov-clickable" data-detalle="'+m.id+'">'+icono+'</div>'+
         '<div class="mov-main mov-clickable" data-detalle="'+m.id+'">'+
-          '<div class="mov-desc">'+esc(m.descripcion)+badgePend+badgeCambio+'</div>'+
-          '<div class="mov-meta">'+esc(m.responsable)+' · '+fmtHora(m.fecha)+catTag+'</div>'+
+          '<div class="mov-desc">'+esc(m.descripcion)+'</div>'+
+          ((badgePend||badgeCambio)?'<div class="mov-badges">'+badgePend+badgeCambio+'</div>':'')+
+          '<div class="mov-meta"><span class="mov-quien">'+(quien?esc(quien)+' · ':'')+fmtHora(m.fecha)+'</span>'+catTag+'</div>'+
         '</div>'+
         '<div class="mov-right mov-clickable" data-detalle="'+m.id+'">'+
           '<div class="mov-amount">'+signo+fmt(m.monto)+'</div>'+
@@ -4952,6 +5125,198 @@ document.getElementById("logoutBtn").addEventListener("click",function(){
 });
 
 // ================================================================
+// Bloqueo con PIN y huella (por equipo). El PIN se guarda como hash
+// SHA-256 con sal; la huella usa WebAuthn con el lector del dispositivo.
+// ================================================================
+var LOCK_KEY="cajaMasPisto_bloqueo";
+var LOCK_INACTIVIDAD=5*60*1000;
+var LOCK_LARGO=4;
+var _lock={ modo:null, pin:"", primerPin:"", intentos:0, esperaHasta:0, ultimaActividad:Date.now() };
+
+function lockLeer(){ try{ return JSON.parse(localStorage.getItem(LOCK_KEY)||"null"); }catch(e){ return null; } }
+function lockEscribir(cfg){ try{ if(cfg) localStorage.setItem(LOCK_KEY, JSON.stringify(cfg)); else localStorage.removeItem(LOCK_KEY); }catch(e){} }
+function lockActivo(){ var c=lockLeer(); return !!(c && c.hash); }
+
+function b64(buf){ return btoa(String.fromCharCode.apply(null, new Uint8Array(buf))); }
+function desdeB64(str){ return Uint8Array.from(atob(str), function(c){ return c.charCodeAt(0); }); }
+function lockHash(pin, sal){
+  return crypto.subtle.digest("SHA-256", new TextEncoder().encode(sal+":"+pin)).then(b64);
+}
+function huellaDisponible(){
+  if(!window.PublicKeyCredential || !PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable) return Promise.resolve(false);
+  return PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable().catch(function(){ return false; });
+}
+
+function lockPintar(){
+  var dots=document.querySelectorAll("#lockDots span");
+  dots.forEach(function(d,i){ d.classList.toggle("lleno", i<_lock.pin.length); });
+}
+function lockError(msg){
+  document.getElementById("lockError").textContent=msg||"";
+  if(msg){
+    var d=document.getElementById("lockDots");
+    d.classList.remove("error"); void d.offsetWidth; d.classList.add("error");
+    if(navigator.vibrate) navigator.vibrate(120);
+  }
+}
+function lockMostrar(modo){
+  _lock.modo=modo; _lock.pin=""; _lock.primerPin="";
+  var cfg=lockLeer()||{};
+  var desbloquear=(modo==="desbloquear");
+  document.getElementById("lockTitulo").textContent=desbloquear?"Ingresa tu PIN":"Crea un PIN de "+LOCK_LARGO+" dígitos";
+  document.getElementById("lockSub").textContent=desbloquear?"Mi Caja está bloqueada":"Lo vas a usar para desbloquear la app en este equipo";
+  document.getElementById("lockOlvide").style.display=desbloquear?"block":"none";
+  document.getElementById("lockCancelar").style.display=desbloquear?"none":"block";
+  document.getElementById("lockHuellaTecla").classList.toggle("oculto", !(desbloquear && cfg.credId));
+  lockError(""); lockPintar();
+  document.getElementById("lockScreen").classList.add("visible");
+  document.body.classList.add("bloqueada");
+  if(document.activeElement && document.activeElement.blur) document.activeElement.blur();
+}
+function lockOcultar(){
+  _lock.modo=null; _lock.pin="";
+  document.getElementById("lockScreen").classList.remove("visible");
+  document.body.classList.remove("bloqueada");
+  _lock.ultimaActividad=Date.now();
+}
+function lockBloquear(){
+  if(!lockActivo() || _lock.modo==="desbloquear") return;
+  lockMostrar("desbloquear");
+}
+
+function lockTecla(k){
+  if(!_lock.modo) return;
+  if(k==="borrar"){ _lock.pin=_lock.pin.slice(0,-1); lockPintar(); return; }
+  if(k==="huella"){ lockConHuella(); return; }
+  if(_lock.pin.length>=LOCK_LARGO) return;
+  if(Date.now()<_lock.esperaHasta){
+    lockError("Demasiados intentos. Espera "+Math.ceil((_lock.esperaHasta-Date.now())/1000)+" s."); return;
+  }
+  _lock.pin+=k; lockError(""); lockPintar();
+  if(_lock.pin.length===LOCK_LARGO) setTimeout(lockCompleto, 120);
+}
+function lockCompleto(){
+  var pin=_lock.pin;
+  if(_lock.modo==="desbloquear"){
+    var cfg=lockLeer(); if(!cfg){ lockOcultar(); return; }
+    lockHash(pin, cfg.sal).then(function(h){
+      if(h===cfg.hash){ _lock.intentos=0; lockOcultar(); return; }
+      _lock.intentos++; _lock.pin=""; lockPintar();
+      if(_lock.intentos>=5){ _lock.esperaHasta=Date.now()+30000; _lock.intentos=0; lockError("PIN incorrecto. Espera 30 s para reintentar."); }
+      else lockError("PIN incorrecto");
+    });
+    return;
+  }
+  // modo "crear": pedir dos veces
+  if(!_lock.primerPin){
+    _lock.primerPin=pin; _lock.pin=""; lockPintar();
+    document.getElementById("lockTitulo").textContent="Confirma tu PIN";
+    return;
+  }
+  if(pin!==_lock.primerPin){
+    _lock.primerPin=""; _lock.pin=""; lockPintar();
+    document.getElementById("lockTitulo").textContent="Crea un PIN de "+LOCK_LARGO+" dígitos";
+    lockError("Los PIN no coinciden, intenta de nuevo"); return;
+  }
+  var sal=b64(crypto.getRandomValues(new Uint8Array(16)));
+  var anterior=lockLeer()||{};
+  lockHash(pin, sal).then(function(h){
+    lockEscribir({ sal:sal, hash:h, credId:anterior.credId||null });
+    lockOcultar(); lockRenderConfig();
+    setSyncState("ok","PIN activado");
+  });
+}
+
+function lockConHuella(){
+  var cfg=lockLeer(); if(!cfg || !cfg.credId) return;
+  navigator.credentials.get({ publicKey:{
+    challenge:crypto.getRandomValues(new Uint8Array(32)),
+    allowCredentials:[{ type:"public-key", id:desdeB64(cfg.credId) }],
+    userVerification:"required", timeout:60000
+  }}).then(function(cred){
+    if(cred){ _lock.intentos=0; lockOcultar(); }
+  }).catch(function(){ lockError("No se reconoció la huella. Usa tu PIN."); });
+}
+function lockActivarHuella(){
+  var cfg=lockLeer(); if(!cfg) return;
+  navigator.credentials.create({ publicKey:{
+    challenge:crypto.getRandomValues(new Uint8Array(32)),
+    rp:{ name:"Mi Caja" },
+    user:{ id:crypto.getRandomValues(new Uint8Array(16)), name:nombreCajero(), displayName:nombreCajero() },
+    pubKeyCredParams:[{ type:"public-key", alg:-7 },{ type:"public-key", alg:-257 }],
+    authenticatorSelection:{ authenticatorAttachment:"platform", userVerification:"required", residentKey:"discouraged" },
+    timeout:60000, attestation:"none"
+  }}).then(function(cred){
+    cfg.credId=b64(cred.rawId); lockEscribir(cfg); lockRenderConfig();
+    setSyncState("ok","Huella activada");
+  }).catch(function(e){
+    if(e && e.name==="NotAllowedError") return; // canceló
+    setSyncState("err","No se pudo activar la huella: "+e.message);
+  });
+}
+
+function lockRenderConfig(){
+  var cfg=lockLeer();
+  var estado=document.getElementById("lockConfigEstado"); if(!estado) return;
+  var pinBtn=document.getElementById("lockPinBtn"), hBtn=document.getElementById("lockHuellaBtn"), qBtn=document.getElementById("lockQuitarBtn");
+  if(!cfg || !cfg.hash){
+    estado.textContent="Sin bloqueo: cualquiera con este equipo puede abrir la caja.";
+    pinBtn.textContent="Configurar PIN"; hBtn.style.display="none"; qBtn.style.display="none"; return;
+  }
+  estado.textContent=cfg.credId?"PIN y huella activos.":"PIN activo.";
+  pinBtn.textContent="Cambiar PIN"; qBtn.style.display="";
+  huellaDisponible().then(function(ok){
+    hBtn.style.display=ok?"":"none";
+    hBtn.textContent=cfg.credId?"Quitar huella":"Activar huella";
+  });
+}
+
+(function(){
+  document.getElementById("lockPad").addEventListener("click", function(e){
+    var b=e.target.closest("[data-k]"); if(b) lockTecla(b.getAttribute("data-k"));
+  });
+  document.addEventListener("keydown", function(e){
+    if(!_lock.modo) return;
+    if(/^[0-9]$/.test(e.key)) lockTecla(e.key);
+    else if(e.key==="Backspace") lockTecla("borrar");
+    e.stopPropagation(); e.preventDefault();
+  }, true);
+  document.getElementById("lockCancelar").addEventListener("click", lockOcultar);
+  document.getElementById("lockOlvide").addEventListener("click", function(){
+    if(!confirm("Se cerrará la sesión y se quitará el PIN de este equipo. Tendrás que iniciar sesión de nuevo con tu correo y contraseña.")) return;
+    lockEscribir(null);
+    sb.auth.signOut().then(function(){ location.reload(); }, function(){ location.reload(); });
+  });
+  document.getElementById("lockPinBtn").addEventListener("click", function(){
+    configOverlay.classList.remove("open"); lockMostrar("crear");
+  });
+  document.getElementById("lockQuitarBtn").addEventListener("click", function(){
+    if(!confirm("¿Quitar el PIN y la huella de este equipo?")) return;
+    lockEscribir(null); lockRenderConfig(); setSyncState("ok","Bloqueo desactivado");
+  });
+  document.getElementById("lockHuellaBtn").addEventListener("click", function(){
+    var cfg=lockLeer(); if(!cfg) return;
+    if(cfg.credId){ cfg.credId=null; lockEscribir(cfg); lockRenderConfig(); setSyncState("ok","Huella desactivada"); }
+    else lockActivarHuella();
+  });
+  document.getElementById("configBtn").addEventListener("click", lockRenderConfig);
+
+  // Inactividad: cualquier toque o tecla reinicia el contador
+  ["pointerdown","keydown","touchstart","wheel","input"].forEach(function(ev){
+    document.addEventListener(ev, function(){ if(!_lock.modo) _lock.ultimaActividad=Date.now(); }, { passive:true, capture:true });
+  });
+  function revisarInactividad(){
+    if(lockActivo() && !_lock.modo && Date.now()-_lock.ultimaActividad>=LOCK_INACTIVIDAD) lockBloquear();
+  }
+  setInterval(revisarInactividad, 10000);
+  // Al volver a la app (el celular puede pausar los temporizadores en segundo plano)
+  document.addEventListener("visibilitychange", function(){ if(document.visibilityState==="visible") revisarInactividad(); });
+
+  // Bloquear al abrir la app
+  if(lockActivo()) lockMostrar("desbloquear");
+})();
+
+// ================================================================
 // Reiniciar caja
 // ================================================================
 document.getElementById("resetBtn").addEventListener("click",function(){
@@ -5001,12 +5366,204 @@ document.querySelectorAll(".tab[data-tab]").forEach(function(btn){
     document.getElementById("tab-"+btn.getAttribute("data-tab")).classList.add("active");
     updateFabVisibility();
     if(btn.getAttribute("data-tab")==="arqueo"){ prepararArqueo(); }
+    if(btn.getAttribute("data-tab")==="rapido"){ posRender(); }
     if(btn.getAttribute("data-tab")==="ordenes"){ ordPrepararNueva(); }
     if(btn.getAttribute("data-tab")==="solicitudes"){ if(typeof renderSolicitudesCajero==="function") renderSolicitudesCajero(); }
     if(btn.getAttribute("data-tab")==="analisis"){ if(typeof renderAnalisis==="function") renderAnalisis(); }
     if(btn.getAttribute("data-tab")==="auditoria"){ if(typeof renderAuditoria==="function") renderAuditoria(); }
   });
 });
+
+// ================================================================
+// Registro rápido (POS): grupos con botones que precargan un movimiento.
+// La configuración se guarda en caja_parametros (clave "posRapido") para
+// que sea la misma en todos los equipos.
+// ================================================================
+var POS_COLORES=["#2F5C9E","#2F7D5B","#C0392B","#9A6B12","#7B4FA0","#0E7C86","#B4532A","#56607A"];
+var posGrupoSel=null, posEditando=false, posItemEditando=null, posTipoSel="ingreso";
+
+function posCfg(){
+  if(!state.posRapido || !Array.isArray(state.posRapido.grupos)) state.posRapido={grupos:[]};
+  state.posRapido.grupos.forEach(function(g){ if(!Array.isArray(g.items)) g.items=[]; });
+  return state.posRapido;
+}
+function posGrupoActual(){
+  var gs=posCfg().grupos;
+  return gs.find(function(g){ return g.id===posGrupoSel; }) || gs[0] || null;
+}
+function posGuardar(msg){
+  setSyncState("syncing","Guardando botones...");
+  return api("updatePosRapido",{ posRapido:posCfg() }).then(function(res){
+    if(datosDelServidor) offGuardarCache();
+    setSyncState("ok", res && res._encolado ? "Guardado sin conexión" : (msg||"Botones guardados"));
+  }).catch(function(err){ setSyncState("err","No se pudieron guardar los botones: "+err.message); });
+}
+
+function posRender(){
+  var chips=document.getElementById("posGrupos"), grid=document.getElementById("posGrid");
+  if(!chips || !grid) return;
+  var cfg=posCfg(), g=posGrupoActual();
+  posGrupoSel=g?g.id:null;
+  var btnEd=document.getElementById("posEditarBtn");
+  btnEd.textContent=posEditando?"Listo":"Editar botones";
+  btnEd.classList.toggle("activo", posEditando);
+  document.getElementById("posSub").textContent=posEditando
+    ? "Modo edición: toca un botón para cambiarlo o agrega nuevos."
+    : "Toca un botón para registrar el movimiento ya lleno.";
+  document.getElementById("posGrupoAcciones").style.display=(posEditando && g)?"flex":"none";
+
+  chips.innerHTML=cfg.grupos.map(function(gr){
+    return '<button type="button" class="pos-chip'+(gr.id===posGrupoSel?" activo":"")+'" data-pos-grupo="'+esc(gr.id)+'">'+
+      '<span class="cat-dot" style="background:'+esc(gr.color||POS_COLORES[0])+';"></span>'+esc(gr.nombre)+'</button>';
+  }).join("")+(posEditando?'<button type="button" class="pos-chip nuevo" id="posNuevoGrupo">+ Grupo</button>':'');
+
+  if(!g){
+    grid.innerHTML='<div class="empty-state" style="grid-column:1/-1;">Todavía no hay botones.<br>Crea un grupo (por ejemplo "Servicios" o "Ventas") y agrega dentro los movimientos que registras seguido.'+
+      '<div style="margin-top:14px;"><button type="button" class="btn btn-ghost" id="posPrimerGrupo">+ Crear primer grupo</button></div></div>';
+    return;
+  }
+  var html=g.items.map(function(it){
+    var quien=it.persona ? (it.tipo==="ingreso"?"De ":"Para ")+it.persona : "";
+    return '<button type="button" class="pos-item '+(it.tipo==="egreso"?"egreso":"ingreso")+'" data-pos-item="'+esc(it.id)+'">'+
+      (posEditando?'<span class="pi-edit">Editar</span>':'')+
+      '<span class="pi-nombre">'+esc(it.nombre)+'</span>'+
+      (quien?'<span class="pi-meta">'+esc(quien)+'</span>':'')+
+      (it.monto>0 ? '<span class="pi-monto">'+(it.tipo==="egreso"?"-":"+")+fmt(it.monto)+'</span>'
+                  : '<span class="pi-monto libre">'+(it.tipo==="egreso"?"Egreso":"Ingreso")+' · monto libre</span>')+
+    '</button>';
+  }).join("");
+  if(posEditando) html+='<button type="button" class="pos-item agregar" id="posAgregarItem">+ Agregar botón</button>';
+  if(!g.items.length && !posEditando){
+    html='<div class="empty-state" style="grid-column:1/-1;">Este grupo no tiene botones. Toca <b>Editar botones</b> para agregar.</div>';
+  }
+  grid.innerHTML=html;
+}
+
+// Abre el formulario de movimiento con los datos del botón ya puestos
+function posUsar(it){
+  openModal();
+  var tb=document.querySelector('#movimientoForm .tipo-btn[data-tipo="'+(it.tipo==="egreso"?"egreso":"ingreso")+'"]');
+  if(tb) tb.click();
+  document.getElementById("modal-title-text").textContent=it.nombre;
+  document.getElementById("descripcionInput").value=it.nombre;
+  if(it.categoria){ poblarCategoriaSelect(it.categoria); _categoriaTocadaManual=true; }
+  else { sugerirCategoriaDesdeDescripcion(); }
+  if(it.persona){
+    var selId=(it.tipo==="egreso")?"entregadoASelect":"responsableSelect";
+    var sel=document.getElementById(selId);
+    if(sel){ sel.value=it.persona; syncPcombo(selId); }
+  }
+  var mo=document.getElementById("montoObjetivoInput");
+  if(it.monto>0){
+    mo.value=it.monto;
+    ejecutarSugerencia(true); // reparte los billetes; el cajero solo confirma o ajusta
+  } else {
+    setTimeout(function(){ mo.focus(); }, 150);
+  }
+}
+
+// ---- Editor de botón ----
+var posItemOverlay=document.getElementById("posItemOverlay");
+function posSetTipo(t){
+  posTipoSel=t;
+  document.querySelectorAll("#posItemForm .tipo-btn").forEach(function(b){ b.classList.toggle("active", b.getAttribute("data-tipo")===t); });
+  document.getElementById("posPersonaLabel").textContent = t==="egreso" ? "Quién recibe (opcional)" : "Quién entrega (opcional)";
+}
+function posAbrirEditor(it){
+  var g=posGrupoActual(); if(!g) return;
+  posItemEditando=it||null;
+  document.getElementById("posItemTitulo").textContent=it?"Editar botón":"Nuevo botón";
+  document.getElementById("posNombre").value=it?it.nombre:"";
+  document.getElementById("posMonto").value=(it&&it.monto>0)?it.monto:"";
+  document.getElementById("posPersona").innerHTML='<option value="">Sin especificar</option>'+
+    state.personas.map(function(n){ return '<option value="'+esc(n)+'">'+esc(n)+'</option>'; }).join("");
+  document.getElementById("posPersona").value=(it&&it.persona)||"";
+  document.getElementById("posCategoria").innerHTML='<option value="">Automática (según el nombre)</option>'+
+    nombresCategorias().map(function(c){ return '<option value="'+esc(c)+'">'+esc(c)+'</option>'; }).join("");
+  document.getElementById("posCategoria").value=(it&&it.categoria)||"";
+  document.getElementById("posGrupoSel").innerHTML=posCfg().grupos.map(function(gr){
+    return '<option value="'+esc(gr.id)+'">'+esc(gr.nombre)+'</option>'; }).join("");
+  document.getElementById("posGrupoSel").value=g.id;
+  document.getElementById("posItemEliminar").style.display=it?"block":"none";
+  document.getElementById("posItemError").style.display="none";
+  posSetTipo(it?it.tipo:"ingreso");
+  posItemOverlay.classList.add("open");
+  setTimeout(function(){ document.getElementById("posNombre").focus(); }, 100);
+}
+function posCerrarEditor(){ posItemOverlay.classList.remove("open"); posItemEditando=null; }
+
+function posNuevoGrupo(){
+  var nombre=(prompt("Nombre del grupo (ej. Servicios, Ventas, Viáticos):")||"").trim();
+  if(!nombre) return;
+  var cfg=posCfg();
+  var gr={ id:uid(), nombre:nombre, color:POS_COLORES[cfg.grupos.length%POS_COLORES.length], items:[] };
+  cfg.grupos.push(gr); posGrupoSel=gr.id; posEditando=true;
+  posRender(); posGuardar("Grupo creado");
+}
+
+(function(){
+  var panel=document.getElementById("tab-rapido");
+  if(!panel) return;
+  document.getElementById("posEditarBtn").addEventListener("click", function(){ posEditando=!posEditando; posRender(); });
+  panel.addEventListener("click", function(e){
+    var chip=e.target.closest("[data-pos-grupo]");
+    if(chip){ posGrupoSel=chip.getAttribute("data-pos-grupo"); posRender(); return; }
+    if(e.target.closest("#posNuevoGrupo") || e.target.closest("#posPrimerGrupo")){ posNuevoGrupo(); return; }
+    if(e.target.closest("#posAgregarItem")){ posAbrirEditor(null); return; }
+    var bt=e.target.closest("[data-pos-item]");
+    if(bt){
+      var g=posGrupoActual(); if(!g) return;
+      var it=g.items.find(function(x){ return x.id===bt.getAttribute("data-pos-item"); }); if(!it) return;
+      if(posEditando) posAbrirEditor(it); else posUsar(it);
+    }
+  });
+  document.getElementById("posRenombrarGrupo").addEventListener("click", function(){
+    var g=posGrupoActual(); if(!g) return;
+    var nombre=(prompt("Nuevo nombre del grupo:", g.nombre)||"").trim();
+    if(!nombre || nombre===g.nombre) return;
+    g.nombre=nombre; posRender(); posGuardar("Grupo renombrado");
+  });
+  document.getElementById("posEliminarGrupo").addEventListener("click", function(){
+    var g=posGrupoActual(); if(!g) return;
+    if(!confirm('¿Eliminar el grupo "'+g.nombre+'"'+(g.items.length?" y sus "+g.items.length+" botones":"")+"?\nLos movimientos ya registrados no se borran.")) return;
+    var cfg=posCfg(); cfg.grupos=cfg.grupos.filter(function(x){ return x.id!==g.id; });
+    posGrupoSel=null; posRender(); posGuardar("Grupo eliminado");
+  });
+
+  document.querySelectorAll("#posItemForm .tipo-btn").forEach(function(b){
+    b.addEventListener("click", function(){ posSetTipo(b.getAttribute("data-tipo")); });
+  });
+  document.getElementById("posItemClose").addEventListener("click", posCerrarEditor);
+  posItemOverlay.addEventListener("click", function(e){ if(e.target===posItemOverlay) posCerrarEditor(); });
+  document.getElementById("posItemForm").addEventListener("submit", function(e){
+    e.preventDefault();
+    var errEl=document.getElementById("posItemError");
+    var nombre=document.getElementById("posNombre").value.trim();
+    var rawMonto=document.getElementById("posMonto").value.trim();
+    var monto=rawMonto===""?0:evalExpr(rawMonto);
+    if(!nombre){ errEl.textContent="Escribe el nombre del botón."; errEl.style.display="block"; return; }
+    if(monto===null || monto<0){ errEl.textContent="El monto no es válido."; errEl.style.display="block"; return; }
+    var cfg=posCfg();
+    var destino=cfg.grupos.find(function(gr){ return gr.id===document.getElementById("posGrupoSel").value; }) || posGrupoActual();
+    var datos={ nombre:nombre, tipo:posTipoSel, monto:round2(monto||0),
+      persona:document.getElementById("posPersona").value, categoria:document.getElementById("posCategoria").value };
+    if(posItemEditando){
+      // Si cambió de grupo, moverlo
+      cfg.grupos.forEach(function(gr){ gr.items=gr.items.filter(function(x){ return x.id!==posItemEditando.id; }); });
+      destino.items.push(Object.assign({}, posItemEditando, datos));
+    } else {
+      destino.items.push(Object.assign({ id:uid() }, datos));
+    }
+    posGrupoSel=destino.id;
+    posCerrarEditor(); posRender(); posGuardar("Botón guardado");
+  });
+  document.getElementById("posItemEliminar").addEventListener("click", function(){
+    if(!posItemEditando || !confirm('¿Eliminar el botón "'+posItemEditando.nombre+'"?')) return;
+    var id=posItemEditando.id;
+    posCfg().grupos.forEach(function(gr){ gr.items=gr.items.filter(function(x){ return x.id!==id; }); });
+    posCerrarEditor(); posRender(); posGuardar("Botón eliminado");
+  });
+})();
 
 // ================================================================
 // Pestaña Auditoría: tabla de movimientos ordenable/filtrable + marcar físico
