@@ -5133,34 +5133,42 @@ document.getElementById("detalleVueltoBtn").addEventListener("click",function(){
     btn.disabled=true; btn.textContent="Registrando...";
     setSyncState("syncing","Registrando entrega...");
 
-    // Construir los movimientos (pendientes de caja)
-    var movs=carrito.map(function(it){
-      return { id:uid(), fecha:fechaISO, tipo:"pendiente",
+    // Construir los movimientos: un efectivo pendiente de caja se guarda como
+    // EGRESO con es_pendiente=true y origen "caja" (la BD no acepta tipo "pendiente").
+    var pendientes=carrito.map(function(it){
+      return { item:it, mov:{ id:uid(), fecha:fechaISO, tipo:"egreso",
         responsable:cajero, entregadoA:verif,
         descripcion:it.descripcion, denominaciones:it.denoms, monto:it.monto,
         firmaEntrega:"", firmaRecibe:"", esPendiente:true, origenPendiente:"caja",
-        esExterno:false, cambioDe:[], categoria:it.categoria };
+        esExterno:false, cambioDe:[], categoria:it.categoria } };
     });
 
-    // Guardar en secuencia para no saturar; cada uno se agrega al estado al confirmar
-    var i=0, errores=0;
+    // Guardar en secuencia; cada ítem guardado se quita del carrito.
+    var i=0, errores=0, ultimoError="";
     function siguiente(){
-      if(i>=movs.length){
-        setSyncState(errores?"err":"ok", errores? (errores+" no se pudieron guardar") : "Entrega registrada ("+movs.length+" desembolsos)");
+      if(i>=pendientes.length){
+        if(errores){
+          setSyncState("err", errores+" no se pudieron guardar");
+          document.getElementById("entregaError").textContent="No se guardaron "+errores+" desembolso(s): "+ultimoError+". Toca Reintentar.";
+          document.getElementById("entregaError").style.display="block";
+          btn.disabled=false; btn.textContent="Reintentar pendientes";
+        } else {
+          setSyncState("ok","Entrega registrada ("+pendientes.length+" desembolsos)");
+          cerrar();
+        }
         renderAll();
-        if(!errores){ cerrar(); }
-        else { btn.disabled=false; btn.textContent="Reintentar pendientes"; }
         return;
       }
-      var mov=movs[i];
-      apiGuardarMovimiento("addMovimiento",mov).then(function(){
-        state.movimientos=state.movimientos.filter(function(m){ return String(m.id)!==String(mov.id); });
-        state.movimientos.push(mov);
-        // quitar del carrito los ya guardados, para que un reintento no los repita
-        carrito=carrito.filter(function(x){ return x.descripcion!==mov.descripcion || x.monto!==mov.monto || x.__ok; });
+      var p=pendientes[i];
+      apiGuardarMovimiento("addMovimiento",p.mov).then(function(){
+        state.movimientos=state.movimientos.filter(function(m){ return String(m.id)!==String(p.mov.id); });
+        state.movimientos.push(p.mov);
+        // quitar del carrito el ítem ya guardado (por su id único)
+        carrito=carrito.filter(function(x){ return x.id!==p.item.id; });
         i++; siguiente();
-      }).catch(function(){
-        errores++; i++; siguiente();
+      }).catch(function(err){
+        errores++; ultimoError=(err&&err.message)?err.message:String(err);
+        i++; siguiente();
       });
     }
     siguiente();
