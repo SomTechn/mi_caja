@@ -2006,14 +2006,21 @@
         </div>
         <div class="field">
           <label for="entregaItemMonto">Monto <span style="color:var(--egreso);">*</span></label>
-          <div class="compare-input-row"><span class="prefix">L</span>
-            <input type="text" inputmode="text" class="compare-input expr-input" id="entregaItemMonto" placeholder="0.00 (o 50+45)"></div>
+          <div class="objetivo-row">
+            <div class="compare-input-row"><span class="prefix">L</span>
+              <input type="text" inputmode="text" class="compare-input expr-input" id="entregaItemMonto" placeholder="0.00 (o 50+45)"></div>
+            <button type="button" class="btn-sugerir" id="entregaSugerirBtn" title="Sugerir cómo dar este monto en billetes">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
+              Sugerir
+            </button>
+          </div>
         </div>
       </div>
       <div class="field">
-        <label>Desglose de billetes <span class="hint" style="font-weight:400;">(opcional — si lo dejas vacío se sugiere del monto)</span></label>
+        <label>Desglose de billetes <span class="hint" style="font-weight:400;">(se sugiere solo del monto; puedes ajustarlo)</span></label>
         <div class="denom-grid" id="entregaItemDenomGrid"></div>
         <div class="cambio-tot-row"><span>Total en billetes</span><span class="mono" id="entregaItemDenomTotal">L 0.00</span></div>
+        <div class="cambio-aviso" id="entregaSugAviso" style="display:none;"></div>
       </div>
       <div class="form-error" id="entregaItemError" style="display:none;"></div>
       <button type="button" class="btn btn-blue" id="entregaAddItemBtn" style="width:100%;">+ Agregar a la lista</button>
@@ -4993,6 +5000,36 @@ document.getElementById("detalleVueltoBtn").addEventListener("click",function(){
   function totalItemDenoms(){
     document.getElementById("entregaItemDenomTotal").textContent=fmt(leerItemDenoms().total);
   }
+  function leerMontoItem(){
+    var el=document.getElementById("entregaItemMonto");
+    var r=evalExpr(el.value);
+    return (r===null||isNaN(r))?null:round2(r);
+  }
+  // Sugerir billetes para el monto, igual que el módulo principal:
+  // limita por el inventario de caja (es un egreso pendiente) y avisa si no alcanza.
+  function sugerirItem(silencioso){
+    var aviso=document.getElementById("entregaSugAviso"); aviso.style.display="none";
+    var objetivo=leerMontoItem();
+    if(objetivo===null || objetivo<=0){
+      if(!silencioso){ aviso.style.display="block"; aviso.textContent="Escribe primero un monto válido."; document.getElementById("entregaItemMonto").focus(); }
+      return;
+    }
+    // Descontar del inventario lo que ya está en el carrito (para sugerir con lo que realmente queda)
+    var disponible=calcInventario();
+    carrito.forEach(function(it){
+      DENOMINACIONES.forEach(function(v){ disponible[v]=(disponible[v]||0)-((it.denoms||{})[v]||0); });
+    });
+    var res=sugerirDenoms(objetivo, disponible);
+    if(res.restante>0){
+      var resLibre=sugerirDenoms(objetivo, null);
+      setItemDenoms(resLibre.denoms);
+      aviso.style.display="block";
+      aviso.innerHTML="⚠ La caja no tiene billetes suficientes para dar exactamente "+fmt(objetivo)+
+        " (contando lo ya agregado a la lista). Se muestra un desglose ideal; ajústalo según el efectivo real.";
+    } else {
+      setItemDenoms(res.denoms);
+    }
+  }
 
   // --- carrito ---
   function renderCarrito(){
@@ -5031,6 +5068,17 @@ document.getElementById("detalleVueltoBtn").addEventListener("click",function(){
     if(sel && !sel.dataset.tocado){ sel.value=sug; }
   });
   document.getElementById("entregaItemCat").addEventListener("change", function(){ this.dataset.tocado="1"; });
+
+  // Sugerencia de billetes: botón manual + auto-sugerir al salir del monto
+  document.getElementById("entregaSugerirBtn").addEventListener("click", function(){ sugerirItem(false); });
+  (function(){
+    var mInp=document.getElementById("entregaItemMonto");
+    mInp.addEventListener("blur", function(){
+      resolverInputExpr(mInp);
+      // auto-sugerir solo si no hay billetes capturados aún (no pisar lo del usuario)
+      if(leerMontoItem()!==null && leerItemDenoms().total===0){ sugerirItem(true); }
+    });
+  })();
 
   // agregar ítem al carrito
   document.getElementById("entregaAddItemBtn").addEventListener("click", function(){
