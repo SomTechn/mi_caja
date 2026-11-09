@@ -4755,15 +4755,17 @@ document.getElementById("detalleVueltoBtn").addEventListener("click",function(){
     if(Math.abs(sale.total-entra.total)>=0.005){
       errEl.textContent="Los montos no cuadran: lo que sale debe ser igual a lo que entra."; errEl.style.display="block"; return;
     }
-    // Validar que haya suficiente inventario para los billetes que salen
+    // Nota: ya NO se bloquea el cambio si el inventario de una denominación
+    // queda negativo. Esto permite cuadrar la caja. Solo se avisa.
     var inv=calcInventario();
-    var faltan=[];
+    var negativos=[];
     DENOMINACIONES.forEach(function(v){
-      if(sale.denoms[v] > (inv[v]||0)) faltan.push(sale.denoms[v]+" x L"+v+" (hay "+(inv[v]||0)+")");
+      if(sale.denoms[v] > (inv[v]||0)) negativos.push("L"+v+" quedará en "+((inv[v]||0)-sale.denoms[v]));
     });
-    if(faltan.length){
-      errEl.textContent="No hay suficientes billetes para el cambio: "+faltan.join(", ")+".";
-      errEl.style.display="block"; return;
+    if(negativos.length){
+      var av=document.getElementById("cambioAviso");
+      av.className="cambio-aviso bad";
+      av.textContent="⚠ El inventario quedará negativo: "+negativos.join(", ")+". Se registrará igual para cuadrar.";
     }
 
     var submitBtn=document.getElementById("cambioSubmit");
