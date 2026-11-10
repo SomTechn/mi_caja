@@ -1524,11 +1524,16 @@
   <div id="tab-auditoria" class="tab-panel">
   <div class="wrap">
     <div class="panel">
-      <h2>Auditoría de movimientos</h2>
-      <p class="ahint">Revisa cada movimiento contra el registro firmado en físico y márcalo al confirmarlo. Toca los encabezados para ordenar.</p>
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+        <div>
+          <h2 style="margin:0;">Auditoría de movimientos</h2>
+          <p class="ahint" style="margin:4px 0 0;">Revisa cada movimiento contra el registro firmado en físico y márcalo al confirmarlo. Toca los encabezados para ordenar.</p>
+        </div>
+        <button type="button" class="btn btn-ghost" id="verCambiosBtn" style="flex-shrink:0;border-color:var(--blue);color:var(--blue);">Registro de cambios</button>
+      </div>
 
       <!-- Resumen de verificación -->
-      <div class="aud-resumen" id="audResumen"></div>
+      <div class="aud-resumen" id="audResumen" style="margin-top:14px;"></div>
 
       <!-- Filtros -->
       <div class="aud-filtros">
@@ -1575,7 +1580,8 @@
           <thead>
             <tr>
               <th class="aud-col-chk"><input type="checkbox" id="audCheckAll" title="Marcar/desmarcar los visibles"></th>
-              <th class="aud-sort" data-sort="fecha">Fecha</th>
+              <th class="aud-sort" data-sort="fecha">Fecha mov.</th>
+              <th class="aud-sort" data-sort="registrado">Registrado</th>
               <th class="aud-sort" data-sort="tipo">Tipo</th>
               <th class="aud-sort" data-sort="descripcion">Descripción</th>
               <th class="aud-sort" data-sort="categoria">Categoría</th>
@@ -2040,6 +2046,48 @@
 
     <div class="form-error" id="entregaError" style="display:none;"></div>
     <button type="button" class="btn btn-blue" id="entregaConfirmBtn" style="width:100%;" disabled>Registrar entrega completa</button>
+  </div>
+</div>
+
+<!-- Modal: registro de cambios (auditoría de ediciones/eliminaciones) -->
+<div class="modal-overlay" id="cambiosOverlay">
+  <div class="modal-card" style="max-width:720px;">
+    <div class="modal-header">
+      <h2>Registro de cambios</h2>
+      <button type="button" class="modal-close" id="cambiosClose">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="modal-subtitle" style="display:block;">Cada vez que un movimiento se crea, edita o elimina queda registrado aquí con su marca de tiempo. Toca los encabezados para ordenar.</div>
+    <div class="aud-filtros" style="margin-bottom:10px;">
+      <div class="aud-f-item">
+        <label>Acción</label>
+        <select id="cambiosAccion">
+          <option value="">Todas</option>
+          <option value="UPDATE">Ediciones</option>
+          <option value="DELETE">Eliminaciones</option>
+          <option value="INSERT">Creaciones</option>
+        </select>
+      </div>
+      <button type="button" class="btn btn-ghost" id="cambiosRecargar" style="align-self:flex-end;padding:8px 14px;">↻ Recargar</button>
+    </div>
+    <div class="aud-tabla-scroll">
+      <table class="aud-tabla" id="cambiosTabla" style="min-width:640px;">
+        <thead>
+          <tr>
+            <th class="aud-sort activo" data-csort="en_ts">Marca de tiempo <span class="arr">▼</span></th>
+            <th class="aud-sort" data-csort="accion">Acción</th>
+            <th class="aud-sort" data-csort="registro_id">Mov. #</th>
+            <th class="aud-sort" data-csort="descripcion_mov">Descripción</th>
+            <th class="aud-sort" data-csort="usuario_nombre">Usuario</th>
+            <th>Cambio</th>
+          </tr>
+        </thead>
+        <tbody id="cambiosTbody"></tbody>
+      </table>
+    </div>
+    <div id="cambiosVacio" class="empty-state" style="display:none;">Aún no hay cambios registrados.</div>
+    <div id="cambiosCargando" class="ahint" style="text-align:center;padding:14px;">Cargando...</div>
   </div>
 </div>
 
@@ -2639,7 +2687,7 @@ function sbTraerTodo(construirConsulta){
 // ---- getData: lee todo lo que el cajero necesita ----
 function sbGetData(){
   return Promise.all([
-    sbTraerTodo(function(){ return sb.from("caja_movimientos").select("id,fecha,tipo,responsable,entregado_a,descripcion,monto,d500,d200,d100,d50,d20,d10,d5,d2,d1,es_pendiente,origen_pendiente,es_externo,cambio_de,categoria,tiene_firma_entrega,tiene_firma_recibe,verificado_fisico,verificado_por,verificado_en").order("fecha",{ascending:false}); }),
+    sbTraerTodo(function(){ return sb.from("caja_movimientos").select("id,fecha,tipo,responsable,entregado_a,descripcion,monto,d500,d200,d100,d50,d20,d10,d5,d2,d1,es_pendiente,origen_pendiente,es_externo,cambio_de,categoria,tiene_firma_entrega,tiene_firma_recibe,verificado_fisico,verificado_por,verificado_en,creado_en,actualizado_en").order("fecha",{ascending:false}); }),
     sb.from("caja_arqueos").select("id,fecha,hora,responsable,verificador,total_contado,efectivo_pendiente,teorico,sistema,excel,diferencia,notas,denominaciones,pendientes_lista,creado_en,tiene_firma_responsable,tiene_firma_verificador").order("creado_en",{ascending:false}),
     sb.from("caja_ordenes").select("id,fecha,descripcion,monto,recibe,autorizador,estado,movimiento_id,creado_en,tiene_firma_autoriza").order("creado_en",{ascending:false}),
     sb.from("caja_personas").select("nombre").order("nombre"),
@@ -5967,6 +6015,7 @@ var audSort={campo:"fecha", dir:"desc"};
 function audValorOrden(m, campo){
   switch(campo){
     case "fecha": return new Date(m.fecha).getTime()||0;
+    case "registrado": return m.creadoEn ? (new Date(m.creadoEn).getTime()||0) : 0;
     case "monto": return m.monto||0;
     case "d500": return (m.denominaciones&&m.denominaciones[500])||0;
     case "verificado": return m.verificadoFisico?1:0;
@@ -6044,6 +6093,9 @@ function renderAuditoria(){
   tbody.innerHTML=lista.map(function(m){
     var fd=parseFechaISO(m.fecha);
     var fechaTxt=pad(fd.getDate())+"/"+pad(fd.getMonth()+1)+"/"+String(fd.getFullYear()).slice(2)+" "+pad(fd.getHours())+":"+pad(fd.getMinutes());
+    var regTxt="—";
+    if(m.creadoEn){ var rd=parseFechaISO(m.creadoEn); regTxt=pad(rd.getDate())+"/"+pad(rd.getMonth()+1)+"/"+String(rd.getFullYear()).slice(2)+" "+pad(rd.getHours())+":"+pad(rd.getMinutes()); }
+    var editado = m.actualizadoEn && m.creadoEn && (new Date(m.actualizadoEn).getTime()-new Date(m.creadoEn).getTime() > 60000);
     var tipoClase=m.tipo==="ingreso"?"aud-tipo-ingreso":(m.tipo==="egreso"?"aud-tipo-egreso":"aud-tipo-otro");
     var tipoTxt=m.tipo==="pendiente_banco"?"pend.banco":m.tipo;
     var d500=(m.denominaciones&&m.denominaciones[500])||0;
@@ -6056,6 +6108,7 @@ function renderAuditoria(){
     return '<tr class="'+(m.verificadoFisico?"aud-verif":"")+'" data-id="'+esc(m.id)+'">'+
       '<td class="aud-col-chk"><input type="checkbox" class="aud-chk" data-id="'+esc(m.id)+'"'+(m.verificadoFisico?" checked":"")+'></td>'+
       '<td class="aud-td-num">'+fechaTxt+'</td>'+
+      '<td class="aud-td-num">'+regTxt+(editado?'<div class="aud-verif-info" style="color:var(--warn);">editado</div>':'')+'</td>'+
       '<td><span class="aud-tipo-badge '+tipoClase+'">'+esc(tipoTxt)+'</span></td>'+
       '<td class="aud-td-desc">'+esc(m.descripcion||"")+'</td>'+
       '<td>'+esc(m.categoria||"Otros")+'</td>'+
@@ -6122,6 +6175,110 @@ function audSetVerificado(id, verificado){
     document.getElementById("audHasta").value="";
     renderAuditoria();
   });
+})();
+
+// ================================================================
+// Registro de cambios (auditoría de ediciones/eliminaciones)
+// ================================================================
+(function(){
+  var overlay=document.getElementById("cambiosOverlay");
+  if(!overlay) return;
+  var filas=[];
+  var sortCampo="en_ts", sortDir="desc";
+  var CAMPOS={ fecha:"fecha", tipo:"tipo", responsable:"entrega", entregado_a:"recibe",
+    descripcion:"descripción", monto:"monto", categoria:"categoría",
+    es_pendiente:"pendiente", origen_pendiente:"origen", es_externo:"externo",
+    d500:"L500", d200:"L200", d100:"L100", d50:"L50", d20:"L20", d10:"L10", d5:"L5", d2:"L2", d1:"L1" };
+  function fmtVal(k,v){
+    if(v===null||v===undefined||v==="") return "—";
+    if(k==="monto") return fmt(Number(v)||0);
+    if(k==="fecha"){ var dt=new Date(v); return isNaN(dt)?String(v):(pad(dt.getDate())+"/"+pad(dt.getMonth()+1)+" "+pad(dt.getHours())+":"+pad(dt.getMinutes())); }
+    if(k==="es_pendiente"||k==="es_externo") return (v===true||v==="true")?"sí":"no";
+    return String(v);
+  }
+  function resumenCambio(r){
+    if(r.accion==="INSERT") return "Creado";
+    if(r.accion==="DELETE") return "Eliminado";
+    var a=r.antes||{}, d=r.despues||{}, cambios=[];
+    Object.keys(CAMPOS).forEach(function(k){
+      if(String(a[k])!==String(d[k])) cambios.push(CAMPOS[k]+": "+fmtVal(k,a[k])+" → "+fmtVal(k,d[k]));
+    });
+    return cambios.length ? cambios.join(" · ") : "(sin cambios visibles)";
+  }
+  function accionBadge(acc){
+    var cls=acc==="DELETE"?"aud-tipo-egreso":(acc==="INSERT"?"aud-tipo-ingreso":"aud-tipo-otro");
+    var txt=acc==="DELETE"?"eliminó":(acc==="INSERT"?"creó":"editó");
+    return '<span class="aud-tipo-badge '+cls+'">'+txt+'</span>';
+  }
+  function cargar(){
+    document.getElementById("cambiosCargando").style.display="block";
+    document.getElementById("cambiosVacio").style.display="none";
+    document.getElementById("cambiosTbody").innerHTML="";
+    sb.from("caja_auditoria")
+      .select("id,registro_id,accion,antes,despues,descripcion_mov,monto,usuario_nombre,en_ts")
+      .order("en_ts",{ascending:false}).limit(500)
+      .then(function(r){
+        document.getElementById("cambiosCargando").style.display="none";
+        if(r.error){ document.getElementById("cambiosVacio").textContent="No se pudo cargar: "+r.error.message; document.getElementById("cambiosVacio").style.display="block"; return; }
+        filas=(r.data||[]); render();
+      }).catch(function(e){
+        document.getElementById("cambiosCargando").style.display="none";
+        document.getElementById("cambiosVacio").textContent="No se pudo cargar: "+e.message;
+        document.getElementById("cambiosVacio").style.display="block";
+      });
+  }
+  function render(){
+    var filtroAcc=document.getElementById("cambiosAccion").value;
+    var lista=filas.filter(function(r){ return !filtroAcc || r.accion===filtroAcc; });
+    var dir=sortDir==="asc"?1:-1;
+    lista.sort(function(a,b){
+      var va,vb;
+      if(sortCampo==="en_ts"){ va=new Date(a.en_ts).getTime()||0; vb=new Date(b.en_ts).getTime()||0; }
+      else if(sortCampo==="registro_id"){ va=Number(a.registro_id)||0; vb=Number(b.registro_id)||0; }
+      else { va=String(a[sortCampo]||"").toLowerCase(); vb=String(b[sortCampo]||"").toLowerCase(); }
+      if(va<vb) return -1*dir; if(va>vb) return 1*dir; return 0;
+    });
+    overlay.querySelectorAll("#cambiosTabla th.aud-sort").forEach(function(th){
+      th.classList.remove("activo");
+      var base=th.getAttribute("data-csort");
+      var label=th.getAttribute("data-label");
+      if(label===null){ label=th.textContent.replace(/[▲▼↕]/g,"").trim(); th.setAttribute("data-label",label); }
+      var txt=esc(label);
+      if(base===sortCampo){ th.classList.add("activo"); txt+=' <span class="arr">'+(sortDir==="asc"?"▲":"▼")+'</span>'; }
+      else { txt+=' <span class="arr">↕</span>'; }
+      th.innerHTML=txt;
+    });
+    if(!lista.length){ document.getElementById("cambiosVacio").style.display="block"; document.getElementById("cambiosTbody").innerHTML=""; return; }
+    document.getElementById("cambiosVacio").style.display="none";
+    document.getElementById("cambiosTbody").innerHTML=lista.map(function(r){
+      var dt=r.en_ts?parseFechaISO(r.en_ts):null;
+      var ts=dt?(pad(dt.getDate())+"/"+pad(dt.getMonth()+1)+"/"+String(dt.getFullYear()).slice(2)+" "+pad(dt.getHours())+":"+pad(dt.getMinutes())+":"+pad(dt.getSeconds())):"—";
+      return '<tr>'+
+        '<td class="aud-td-num">'+ts+'</td>'+
+        '<td>'+accionBadge(r.accion)+'</td>'+
+        '<td class="aud-td-num">'+esc(r.registro_id||"")+'</td>'+
+        '<td class="aud-td-desc">'+esc(r.descripcion_mov||"")+'</td>'+
+        '<td>'+esc(r.usuario_nombre||"—")+'</td>'+
+        '<td class="aud-td-desc" style="font-size:11.5px;">'+esc(resumenCambio(r))+'</td>'+
+      '</tr>';
+    }).join("");
+  }
+  overlay.querySelectorAll("#cambiosTabla th.aud-sort").forEach(function(th){
+    th.addEventListener("click", function(){
+      var campo=th.getAttribute("data-csort");
+      if(sortCampo===campo){ sortDir=(sortDir==="asc"?"desc":"asc"); }
+      else { sortCampo=campo; sortDir=(campo==="en_ts"||campo==="registro_id")?"desc":"asc"; }
+      render();
+    });
+  });
+  document.getElementById("cambiosAccion").addEventListener("change", render);
+  document.getElementById("cambiosRecargar").addEventListener("click", cargar);
+  function abrir(){ overlay.classList.add("open"); cargar(); }
+  function cerrar(){ overlay.classList.remove("open"); }
+  var btn=document.getElementById("verCambiosBtn");
+  if(btn) btn.addEventListener("click", abrir);
+  document.getElementById("cambiosClose").addEventListener("click", cerrar);
+  overlay.addEventListener("click", function(e){ if(e.target===overlay) cerrar(); });
 })();
 
 // ================================================================
