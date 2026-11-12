@@ -36,13 +36,38 @@ body{background:var(--bg);color:var(--ink);font:15px/1.45 var(--f-ui);margin:0}
 h1,h2,h3{margin:0;text-wrap:balance}
 button,input,select,textarea{font:inherit;color:inherit}
 :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-header.top{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding-block:18px 10px}
-.brand{display:flex;align-items:baseline;gap:8px;margin-right:auto}
-.brand h1{font-size:22px;font-weight:700;letter-spacing:-.01em}
-.brand span{color:var(--muted);font-size:13px}
-nav.tabs{display:flex;gap:4px;background:var(--sunk);padding:4px;border-radius:999px;overflow-x:auto;max-width:100%}
-nav.tabs button{border:0;background:transparent;padding:7px 14px;border-radius:999px;cursor:pointer;font-weight:600;color:var(--muted);white-space:nowrap}
-nav.tabs button[aria-selected="true"]{background:var(--surface);color:var(--ink);box-shadow:0 1px 2px rgb(0 0 0/.12)}
+/* Estructura: menú lateral agrupado en escritorio; en teléfono el menú pasa arriba como pestañas desplazables */
+.shell{display:grid;grid-template-columns:232px minmax(0,1fr);min-height:100vh}
+.side{position:sticky;top:0;height:100vh;display:flex;flex-direction:column;gap:12px;padding:18px 12px 14px;border-right:1px solid var(--line);background:var(--surface);overflow-y:auto}
+.brand{display:flex;align-items:center;gap:10px;padding:0 6px 6px}
+.brand .logo{width:34px;height:34px;border-radius:9px;background:var(--accent);color:var(--on-accent);display:grid;place-items:center;font-weight:700;font-size:16px;flex:none}
+.brand h1{font-size:18px;font-weight:700;letter-spacing:-.01em;line-height:1.1}
+.brand span{color:var(--muted);font-size:12px;line-height:1.2;display:block}
+nav.tabs{display:flex;flex-direction:column;gap:2px}
+nav.tabs button{display:flex;align-items:center;gap:10px;border:0;background:none;padding:8px 10px;border-radius:8px;font-weight:600;color:var(--muted);text-align:left;cursor:pointer;white-space:nowrap}
+nav.tabs button svg{width:18px;height:18px;flex:none;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+nav.tabs button:hover{background:var(--sunk);color:var(--ink)}
+nav.tabs button[aria-selected="true"]{background:var(--accent-soft);color:var(--accent)}
+nav.tabs .nb{margin-left:auto;font-family:var(--f-num);font-size:11.5px;border-radius:999px;padding:0 7px;background:var(--bad-soft);color:var(--bad)}
+.nav-g{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:700;padding:14px 10px 4px}
+.side-foot{margin-top:auto;display:flex;flex-direction:column;gap:6px;font-size:12.5px;color:var(--muted);padding:10px 6px 0;border-top:1px solid var(--line)}
+.side-foot .u{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.content{min-width:0;width:100%;max-width:1320px;padding:18px 24px 72px}
+.ph{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+.ph h2{font-size:22px;font-weight:700;letter-spacing:-.01em}
+.ph p{margin:2px 0 0;color:var(--muted);font-size:13.5px}
+@media (max-width:1000px){
+  .shell{grid-template-columns:minmax(0,1fr)}
+  .side{position:sticky;z-index:10;height:auto;padding:10px 16px 0;border-right:0;border-bottom:1px solid var(--line);gap:6px;overflow:visible}
+  .brand{padding:0}
+  .brand .logo{width:28px;height:28px;font-size:14px}
+  nav.tabs{flex-direction:row;overflow-x:auto;scrollbar-width:none;padding-bottom:6px;margin-inline:-6px}
+  nav.tabs::-webkit-scrollbar{display:none}
+  nav.tabs button{padding:7px 10px}
+  nav.tabs button svg{width:16px;height:16px}
+  .nav-g,.side-foot{display:none}
+  .content{padding:12px 16px 72px}
+}
 .banner{border-radius:var(--r);padding:10px 14px;margin-block:8px;font-size:14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
 .banner.ex{background:var(--warn-soft);color:var(--warn)}
 .banner.err{background:var(--bad-soft);color:var(--bad)}
@@ -161,27 +186,85 @@ details summary{cursor:pointer;font-weight:600}
 .dates{display:flex;flex-wrap:wrap;gap:6px}
 .date-chip{border:1px solid var(--line);border-radius:8px;padding:6px 10px;background:var(--surface);cursor:pointer;font-size:13px}
 .date-chip[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-soft)}
+/* Tablero */
+.meter{height:6px;border-radius:999px;background:var(--sunk);overflow:hidden;margin-top:8px}
+.meter span{display:block;height:100%;background:currentColor;border-radius:inherit}
+.kpi .meter{color:var(--accent)} .kpi.ok .meter{color:var(--ok)} .kpi.warn .meter{color:var(--warn)} .kpi.bad .meter{color:var(--bad)}
+.meter.sm{height:4px;margin-top:4px;min-width:70px;color:var(--accent)}
+.aging{display:flex;flex-direction:column;gap:2px}
+.ag-row{display:grid;grid-template-columns:110px minmax(0,1fr) 40px 120px;gap:10px;align-items:center;border:0;background:none;padding:6px 4px;border-radius:6px;cursor:pointer;text-align:left;font-size:13.5px}
+.ag-row:hover{background:var(--sunk)}
+.ag-bar{height:10px;background:var(--sunk);border-radius:999px;overflow:hidden}
+.ag-bar span{display:block;height:100%;background:var(--accent);border-radius:inherit;min-width:2px}
+.ag-bar span.warn{background:var(--warn)} .ag-bar span.bad{background:var(--bad)}
+.ag-n,.ag-m{text-align:right}
+@media (max-width:560px){.ag-row{grid-template-columns:90px minmax(0,1fr) 30px;}.ag-m{display:none}}
+ul.checks{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+ul.checks li{display:flex;gap:10px;align-items:flex-start;font-size:13.5px}
+ul.checks li .ico{flex:none;width:20px;height:20px;border-radius:50%;display:grid;place-items:center;font-size:12px;font-weight:700;background:var(--ok-soft);color:var(--ok)}
+ul.checks li.warn .ico{background:var(--warn-soft);color:var(--warn)} ul.checks li.bad .ico{background:var(--bad-soft);color:var(--bad)}
+ul.checks li > span:nth-child(2){flex:1}
+.cal-wrap{overflow-x:auto}
+.cal{display:grid;gap:3px;min-width:max-content;align-items:center}
+.cal-h{text-align:center;font-family:var(--f-num);font-size:11px;color:var(--muted);line-height:1.1}
+.cal-h span{display:block;font-family:var(--f-ui);font-size:10px;text-transform:uppercase}
+.cal-h.we{opacity:.6}
+.cal-b{font-size:12.5px;font-weight:600;padding-right:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cal-c{height:24px;min-width:22px;border-radius:5px;border:1px solid transparent;font:600 11px var(--f-num);cursor:pointer;padding:0;background:var(--sunk);color:var(--muted);display:inline-grid;place-items:center}
+.cal-c.ok{background:var(--ok-soft);border-color:color-mix(in srgb,var(--ok) 35%,transparent)}
+.cal-c.pend{background:var(--bad-soft);color:var(--bad);border-color:color-mix(in srgb,var(--bad) 40%,transparent)}
+.cal-c.noban{background:var(--warn-soft);border-color:color-mix(in srgb,var(--warn) 40%,transparent)}
+.cal-c.nosis{background:repeating-linear-gradient(135deg,var(--sunk) 0 3px,var(--line) 3px 5px)}
+.cal-c.vac{background:transparent;border-color:var(--line)}
+.cal-c.fut{background:transparent;cursor:default;opacity:.3;border-color:var(--line);border-style:dashed}
+.cal-c.lock{box-shadow:inset 0 0 0 2px var(--accent)}
+.cal-c:not(:disabled):hover{outline:2px solid var(--ink);outline-offset:1px}
+.cal-ley{display:flex;flex-wrap:wrap;gap:6px 14px}
+.cal-ley span{display:flex;align-items:center;gap:6px}
+.cal-ley i{width:14px;height:14px;min-width:14px;cursor:default;display:inline-block}
+.nw{white-space:nowrap}
+/* Riesgo en pendientes */
+.item.r3{box-shadow:inset 3px 0 0 var(--bad)} .item.r2{box-shadow:inset 3px 0 0 var(--warn)}
+.item.flash{animation:flash 1.6s ease-out}
+@keyframes flash{0%,40%{background:var(--accent-soft)}100%{background:transparent}}
+.ptools{display:flex;gap:8px;flex-wrap:wrap;align-items:center;justify-content:space-between}
+.fchips{display:flex;gap:4px;flex-wrap:wrap}
+.fchip{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:4px 10px;font-size:12.5px;font-weight:600;cursor:pointer;color:var(--muted)}
+.fchip[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-soft);color:var(--accent)}
+.fchip.bad[aria-pressed="true"]{border-color:var(--bad);background:var(--bad-soft);color:var(--bad)}
+.fchip .num{font-size:11.5px;margin-left:3px}
+.lockban{background:var(--accent-soft);color:var(--accent);border-radius:var(--r);padding:10px 14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;font-size:14px}
+.lockban b{color:var(--ink)}
+ol.flujo{margin:0;padding-left:20px;font-size:13.5px;display:flex;flex-direction:column;gap:4px}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 </style>
 
 </head>
 <body>
-<div class="wrap">
-  <header class="top">
-    <div class="brand"><h1>Concilia</h1><span>Más Pisto · conciliación bancaria</span></div>
-    <nav class="tabs" role="tablist" id="tabs">
-      <button role="tab" data-tab="conciliar" aria-selected="true">Conciliar</button>
-      <button role="tab" data-tab="bancos" aria-selected="false">Estados de cuenta</button>
-      <button role="tab" data-tab="sistema" aria-selected="false">Reporte del sistema</button>
-      <button role="tab" data-tab="movimientos" aria-selected="false">Movimientos</button>
-      <button role="tab" data-tab="errores" aria-selected="false">Errores</button>
-      <button role="tab" data-tab="historial" aria-selected="false">Historial</button>
-      <button role="tab" data-tab="bitacora" aria-selected="false">Bitácora</button>
-      <button role="tab" data-tab="ajustes" aria-selected="false">Ajustes</button>
+<div class="shell">
+  <aside class="side">
+    <div class="brand"><span class="logo" aria-hidden="true">C</span><div><h1>Concilia</h1><span>Más Pisto · conciliación bancaria</span></div></div>
+    <nav class="tabs" role="tablist" id="tabs" aria-label="Secciones">
+      <div class="nav-g">Operación</div>
+      <button role="tab" data-tab="tablero" aria-selected="false"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg><span>Tablero</span><span class="nb" data-nb="tablero" hidden></span></button>
+      <button role="tab" data-tab="conciliar" aria-selected="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h13l-3-3M20 16H7l3 3"/></svg><span>Conciliar</span><span class="nb" data-nb="conciliar" hidden></span></button>
+      <button role="tab" data-tab="movimientos" aria-selected="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01"/></svg><span>Movimientos</span><span class="nb" data-nb="movimientos" hidden></span></button>
+      <div class="nav-g">Cargas</div>
+      <button role="tab" data-tab="bancos" aria-selected="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10l9-6 9 6M5 10v8M9.5 10v8M14.5 10v8M19 10v8M3 21h18"/></svg><span>Estados de cuenta</span><span class="nb" data-nb="bancos" hidden></span></button>
+      <button role="tab" data-tab="sistema" aria-selected="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h6"/></svg><span>Reporte del sistema</span><span class="nb" data-nb="sistema" hidden></span></button>
+      <div class="nav-g">Control</div>
+      <button role="tab" data-tab="errores" aria-selected="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4l9 16H3z"/><path d="M12 10v4M12 17h.01"/></svg><span>Errores</span><span class="nb" data-nb="errores" hidden></span></button>
+      <button role="tab" data-tab="historial" aria-selected="false"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg><span>Cierres</span><span class="nb" data-nb="historial" hidden></span></button>
+      <button role="tab" data-tab="bitacora" aria-selected="false"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span>Bitácora</span><span class="nb" data-nb="bitacora" hidden></span></button>
+      <div class="nav-g">Sistema</div>
+      <button role="tab" data-tab="ajustes" aria-selected="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg><span>Ajustes</span><span class="nb" data-nb="ajustes" hidden></span></button>
     </nav>
-  </header>
-  <div id="banners"></div>
-  <main id="view"></main>
+    <div class="side-foot" id="sideFoot"></div>
+  </aside>
+  <div class="content">
+    <div id="banners"></div>
+    <main id="view"></main>
+  </div>
 </div>
 <div id="toast" class="toast" hidden></div>
 
@@ -735,7 +818,7 @@ async function cargar() {
   }
   const { data: cfg, error: ec } = await SB.from('cb_config').select('data').eq('id', 1).maybeSingle();
   if (ec) throw ec;
-  if (cfg && cfg.data && cfg.data.bancos) nuevo.cfg = { bancos: cfg.data.bancos, feriados: cfg.data.feriados || [], cuentas: cfg.data.cuentas || {}, cargos: cfg.data.cargos || CARGOS_BASE.slice(), tolerancia: cfg.data.tolerancia ?? 1 };
+  if (cfg && cfg.data && cfg.data.bancos) nuevo.cfg = { bancos: cfg.data.bancos, feriados: cfg.data.feriados || [], cuentas: cfg.data.cuentas || {}, cargos: cfg.data.cargos || CARGOS_BASE.slice(), tolerancia: cfg.data.tolerancia ?? 1, umbral: cfg.data.umbral ?? 5000, transito: cfg.data.transito ?? 3, aprobOtro: !!cfg.data.aprobOtro };
   const [sis, links, just, noauto, cierres] = await Promise.all([
     todos(() => SB.from('cb_sistema').select('fecha,secciones,avisos,texto,updated_by,updated_at').order('fecha')),
     todos(() => SB.from('cb_vinculos').select('id,s,b,nota,created_by').order('id')),
@@ -763,7 +846,10 @@ async function cargar() {
 function w(promesa, okMsg) {
   if (ejemplo) { if (okMsg) toast(okMsg + ' (ejemplo, no se guarda)'); return Promise.resolve(); }
   return Promise.resolve(promesa).then(res => { if (res && res.error) throw res.error; if (okMsg) toast(okMsg); return res; })
-    .catch(e => { storageOk = false; renderBanners(); toast('No se guardó: ' + (e.message || e)); throw e; });
+    .catch(e => {
+      if (/PERIODO_CERRADO/.test(e.message || '')) { toast('No se guardó: ese período está cerrado y aprobado. Reábralo en Cierre para cambiarlo.'); throw e; }
+      if (/APROBACION_/.test(e.message || '')) { toast('No se guardó: ' + String(e.message).replace(/^.*APROBACION_[A-Z_]+:\s*/, '')); throw e; }
+      storageOk = false; renderBanners(); toast('No se guardó: ' + (e.message || e)); throw e; });
 }
 const ahora = () => new Date().toISOString();
 const dbCfg = msg => w(SB && SB.from('cb_config').upsert({ id: 1, data: ST.cfg, updated_at: ahora(), updated_by: usr() }), msg);
@@ -784,9 +870,9 @@ async function dbLink(link) {
 const dbBorrarLink = id => w(SB && SB.from('cb_vinculos').delete().eq('id', id), 'Separado: ahora están en Pendientes');
 const dbJust = (ids, nota, msg) => w(SB && SB.from('cb_justificados').upsert(ids.map(item_id => ({ item_id, nota: nota || null, created_by: usr() })), { onConflict: 'item_id' }), msg);
 const dbDesJust = ids => w(SB && SB.from('cb_justificados').delete().in('item_id', ids));
-async function dbCierre(row) {
-  if (ejemplo) { toast('Cierre guardado (ejemplo, no se guarda)'); return { ...row, id: 'ej' + Date.now(), created_at: ahora(), created_by: usr() }; }
-  const { data } = await w(SB.from('cb_cierres').upsert({ ...row, created_at: ahora(), created_by: usr() }, { onConflict: 'banco,desde,hasta' }).select('id,banco,desde,hasta,datos,diferencia,nota,created_at,created_by').single(), 'Cierre guardado');
+async function dbCierre(row, msg = 'Cierre guardado') {
+  if (ejemplo) { toast(msg + ' (ejemplo, no se guarda)'); return { ...row, id: 'ej' + Date.now(), created_at: ahora(), created_by: usr() }; }
+  const { data } = await w(SB.from('cb_cierres').upsert({ ...row, created_at: ahora(), created_by: usr() }, { onConflict: 'banco,desde,hasta' }).select('id,banco,desde,hasta,datos,diferencia,nota,created_at,created_by').single(), msg);
   return data;
 }
 async function dbCrearCaso(row) {
@@ -797,6 +883,11 @@ async function dbCrearCaso(row) {
 async function dbActualizarCaso(id, patch, msg) {
   if (ejemplo) { toast((msg || 'Guardado') + ' (ejemplo, no se guarda)'); return { ...ST.casos.find(c => c.id == id), ...patch }; }
   const { data } = await w(SB.from('cb_casos').update({ ...patch, updated_at: ahora() }).eq('id', id).select('*').single(), msg);
+  return data;
+}
+async function dbCierreUpd(id, datos, msg) {
+  if (ejemplo) { toast(msg + ' (ejemplo, no se guarda)'); return { ...ST.cierres.find(c => c.id == id), datos }; }
+  const { data } = await w(SB.from('cb_cierres').update({ datos }).eq('id', id).select('id,banco,desde,hasta,datos,diferencia,nota,created_at,created_by').single(), msg);
   return data;
 }
 const dbBorrarCierre = id => w(SB && SB.from('cb_cierres').delete().eq('id', id), 'Cierre borrado');
@@ -847,12 +938,17 @@ async function copiar(texto, msg = 'Copiado. Péguelo en Excel.') {
 }
 
 /* ================== Navegación ================== */
-const UI = { selErr: new Set(), errF: {}, errLim: 150, errTodo: false, errCargos: false, verRotas: false, versiones: {}, cmp: null, selDep: new Set(), depCaso: false, selCaso: false, movSort: { k: 'f', dir: 'asc' }, movLim: 200, movBanco: '', movTipo: '', movEstado: '', movQ: '', logArea: '', verLog: null, casoAbierto: null, segFiltro: 'abiertos', verCaso: null, casoNota: null, casoAccion: null, justAbierto: null, cierreIn: {}, verCierre: null, rD: null, rH: null, tab: 'conciliar', banco: null, desde: null, hasta: null, vista: 'pend', sel: new Set(), imp: null, sisPrev: null, sisFecha: null, sisTexto: '', verDia: null, confirm: null };
-try { const t = localStorage.getItem('concilia.tab'); if (t) UI.tab = t; } catch (e) {}
+const UI = { selErr: new Set(), errF: {}, errLim: 150, errTodo: false, errCargos: false, verRotas: false, versiones: {}, cmp: null, selDep: new Set(), depCaso: false, selCaso: false, movSort: { k: 'f', dir: 'asc' }, movLim: 200, movBanco: '', movTipo: '', movEstado: '', movQ: '', logArea: '', verLog: null, casoAbierto: null, segFiltro: 'abiertos', verCaso: null, casoNota: null, casoAccion: null, justAbierto: null, cierreIn: {}, verCierre: null, rD: null, rH: null, tab: 'conciliar', banco: null, desde: null, hasta: null, vista: 'pend', sel: new Set(), imp: null, sisPrev: null, sisFecha: null, sisTexto: '', verDia: null, confirm: null, tD: null, tH: null, pFil: { b: -1, alto: false }, pOrd: 'riesgo', foco: null, reabrir: false };
+UI.tab = 'tablero';
+try { const t = localStorage.getItem('concilia.tab2'); if (t) UI.tab = t; const p = JSON.parse(localStorage.getItem('concilia.pend') || 'null'); if (p) { UI.pOrd = p.o || UI.pOrd; } } catch (e) {}
+let TEMA = 'auto';
+try { TEMA = localStorage.getItem('concilia.tema') || 'auto'; } catch (e) {}
+const aplicarTema = () => { if (TEMA === 'auto') document.documentElement.removeAttribute('data-theme'); else document.documentElement.dataset.theme = TEMA; };
+aplicarTema();
 $('#tabs').addEventListener('click', e => {
   const b = e.target.closest('button[data-tab]'); if (!b) return;
-  UI.tab = b.dataset.tab; try { localStorage.setItem('concilia.tab', UI.tab); } catch (e) {}
-  render();
+  UI.tab = b.dataset.tab; try { localStorage.setItem('concilia.tab2', UI.tab); } catch (e) {}
+  render(); window.scrollTo({ top: 0 });
 });
 function renderBanners() {
   let h = '';
@@ -875,14 +971,26 @@ function vAcceso() {
     <label class="f">Contraseña<input type="password" id="logPass" autocomplete="current-password" required></label>
     <div class="row"><button class="btn pri" type="submit" id="btnLogin">Entrar</button>${SUPABASE_URL ? '' : '<button class="btn ghost" type="button" data-act="cambiarConexion">Cambiar conexión</button>'}</div></form>`;
 }
+function renderSide() {
+  const f = $('#sideFoot'); if (!f) return;
+  const enApp = FASE.v === 'app' || ejemplo;
+  const temaTxt = { auto: 'Tema: automático', light: 'Tema: claro', dark: 'Tema: oscuro' }[TEMA];
+  f.innerHTML = enApp ? `<span class="u" title="${esc(usr() || '')}">${esc(usr() || 'Ejemplo')}</span><div class="row" style="gap:6px"><button class="btn sm ghost" data-act="tema">${temaTxt}</button></div>` : '';
+  const casosAb = (ST.casos || []).filter(c => c.estado !== 'confirmado').length;
+  const nb = { conciliar: 0, errores: 0 };
+  const set = (k, n) => { const e = document.querySelector(`[data-nb="${k}"]`); if (e) { e.hidden = !n; e.textContent = n; } };
+  set('conciliar', enApp ? casosAb : 0); set('errores', nb.errores);
+}
 function render() {
   const enApp = FASE.v === 'app' || ejemplo;
   $('#tabs').hidden = !enApp;
+  renderSide();
   if (!enApp) { renderBanners(); $('#view').innerHTML = vAcceso(); return; }
   document.querySelectorAll('#tabs button').forEach(b => b.setAttribute('aria-selected', b.dataset.tab === UI.tab));
   renderBanners();
   const v = $('#view');
-  if (UI.tab === 'conciliar') v.innerHTML = vConciliar();
+  if (UI.tab === 'tablero') v.innerHTML = vTablero();
+  else if (UI.tab === 'conciliar') v.innerHTML = vConciliar();
   else if (UI.tab === 'bancos') v.innerHTML = vBancos();
   else if (UI.tab === 'sistema') v.innerHTML = vSistema();
   else if (UI.tab === 'historial') v.innerHTML = vHistorial();
@@ -890,6 +998,169 @@ function render() {
   else if (UI.tab === 'bitacora') v.innerHTML = vBitacora();
   else if (UI.tab === 'errores') v.innerHTML = vErrores();
   else v.innerHTML = vAjustes();
+  if (UI.foco) { const id = UI.foco; UI.foco = null; requestAnimationFrame(() => { const el = document.querySelector(`[data-item="${CSS.escape(id)}"]`); if (el) { el.scrollIntoView({ block: 'center', behavior: 'smooth' }); el.classList.add('flash'); } }); }
+}
+
+/* ================== Controles: riesgo, antigüedad y bloqueo de períodos ================== */
+const CTRL = () => ({ umbral: +(ST.cfg.umbral ?? 5000), transito: +(ST.cfg.transito ?? 3), aprobOtro: !!ST.cfg.aprobOtro });
+const edadDias = x => Math.max(0, E.dn(hoy()) - E.dn(x.f));
+const AGING = [[0, 3, '0 a 3 días'], [4, 7, '4 a 7 días'], [8, 15, '8 a 15 días'], [16, 30, '16 a 30 días'], [31, 1e9, 'Más de 30 días']];
+const bucketDe = d => AGING.findIndex(([a, b]) => d >= a && d <= b);
+const NIVEL = { 3: ['bad', 'Riesgo alto'], 2: ['warn', 'Riesgo medio'], 1: ['', 'Riesgo bajo'] };
+/* Clasifica una partida abierta según lo que puede costarle a la financiera si no se resuelve */
+function riesgo(x) {
+  const k = CTRL(), e = edadDias(x);
+  let cat, n;
+  const dup = (x.flags || []).some(f => f.t === 'dup');
+  if (x.lado === 'b' && x.dir === 'out') {
+    if (esCargo(x)) { cat = 'Cargo bancario sin registrar'; n = 1; }
+    else { cat = 'Salida de dinero sin registrar'; n = 3; }
+  } else if (x.lado === 's' && x.dir === 'in') {
+    if (dup) { cat = 'Posible pago aplicado dos veces'; n = 3; }
+    else { cat = 'Pago registrado que no está en el banco'; n = e > k.transito ? 3 : 2; }
+  } else if (x.lado === 'b') { cat = 'Depósito sin aplicar'; n = e > 7 ? 3 : 2; }
+  else { cat = 'Egreso registrado que no salió del banco'; n = e > 7 ? 2 : 1; }
+  const alto = x.monto >= k.umbral;
+  if (alto && n < 3 && cat !== 'Cargo bancario sin registrar') n++;
+  return { n, cat, edad: e, alto, b: bucketDe(e) };
+}
+const pillRiesgo = r => `<span class="pill ${NIVEL[r.n][0]}" title="${esc(r.cat)}">${NIVEL[r.n][1]}</span>`;
+const textoEdad = e => e === 0 ? 'hoy' : e === 1 ? 'hace 1 día' : `hace ${e} días`;
+
+/* Un período aprobado queda cerrado: nada de lo que cae en él se puede cambiar sin reabrirlo */
+const estadoCierre = c => (c && c.datos && c.datos.estado) || (c ? 'preparado' : null);
+function cierreAprobado(bid, f) { return (ST.cierres || []).find(c => c.banco === bid && f >= c.desde && f <= c.hasta && estadoCierre(c) === 'aprobado') || null; }
+function fbDeId(id) { const p = String(id).split('|'); return /^\d{4}-\d{2}-\d{2}$/.test(p[0]) ? { f: p[0], b: p[1] } : { f: p[1], b: p[0] }; }
+const cierreDeIds = ids => { for (const id of ids) { const { f, b } = fbDeId(id); const c = cierreAprobado(b, f); if (c) return c; } return null; };
+const avisoCerrado = c => toast(`${bancoN(c.banco)} · ${nombrePeriodo(c.desde, c.hasta)} está cerrado y aprobado. Reábralo en Cierre para cambiarlo.`);
+function bloqueado(ids) { const c = cierreDeIds(ids); if (c) avisoCerrado(c); return !!c; }
+function bloqueadoBF(pares) { for (const [b, f] of pares) { const c = cierreAprobado(b, f); if (c) { avisoCerrado(c); return true; } } return false; }
+const estable = o => JSON.stringify(o, (k, v) => v && typeof v === 'object' && !Array.isArray(v) ? Object.keys(v).sort().reduce((a, x) => (a[x] = v[x], a), {}) : v);
+/* Bancos cerrados cuya sección cambiaría al guardar un día del reporte */
+function seccionesCerradasCambiadas(f, nuevo) {
+  const viejo = ST.sis[f] || { secciones: {} };
+  const bancos = new Set([...Object.keys(viejo.secciones || {}), ...Object.keys((nuevo && nuevo.secciones) || {})]);
+  return [...bancos].filter(b => cierreAprobado(b, f) && estable(viejo.secciones?.[b] ?? null) !== estable(nuevo?.secciones?.[b] ?? null));
+}
+
+/* ================== Tablero ================== */
+function rangoTablero() {
+  if (UI.tD && UI.tH) return;
+  const fs = Object.keys(ST.sis).sort(); const last = fs.length ? fs[fs.length - 1] : hoy();
+  const m = mesContable(last); UI.tD = m.desde; UI.tH = m.hasta;
+}
+const ultimoEstado = bid => { const m = ST.mov[bid] || []; return m.length ? m[m.length - 1].f : null; };
+const ultimoReporte = bid => Object.keys(ST.sis).sort().reverse().find(f => (ST.sis[f].secciones?.[bid]?.items || []).length) || null;
+function diasRango(d, h) { const out = []; for (let f = d; f <= h && out.length < 62; f = E.addDays(f, 1)) out.push(f); return out; }
+const esFinde = f => { const w = E.dow(E.dn(f)); return w === 0 || w === 6; };
+function partidasAbiertas() {
+  return Object.keys(RES).flatMap(bid => [...RES[bid].soloSis, ...RES[bid].soloBan].map(x => ({ x, bid, r: riesgo(x) })));
+}
+const ordenRiesgo = (a, b) => b.r.n - a.r.n || b.x.monto - a.x.monto || b.r.edad - a.r.edad;
+function controlesTablero(dias) {
+  const out = [];
+  const hoyF = hoy(), limite = E.addDays(hoyF, -3);
+  const atrasados = Object.keys(RES).filter(b => { const u = ultimoEstado(b); return !u || u < limite; });
+  out.push(atrasados.length ? ['warn', `Estado de cuenta atrasado: ${atrasados.map(b => `${bancoN(b)} (${ultimoEstado(b) ? 'hasta ' + fdl(ultimoEstado(b)) : 'sin cargar'})`).join(', ')}`, 'bancos'] : ['ok', 'Todos los estados de cuenta están al día (menos de 3 días)']);
+  const sinRep = dias.filter(f => f <= hoyF && !esFinde(f) && !ST.sis[f] && !feriadosEfectivos().includes(f));
+  out.push(sinRep.length ? ['warn', `${sinRep.length} día${sinRep.length > 1 ? 's' : ''} hábil${sinRep.length > 1 ? 'es' : ''} sin reporte del sistema: ${sinRep.slice(0, 6).map(fd).join(', ')}${sinRep.length > 6 ? '…' : ''}`, 'sistema'] : ['ok', 'Hay reporte del sistema para todos los días hábiles']);
+  const saltos = Object.keys(RES).map(b => [b, E.revisarSaldos((ST.mov[b] || []).filter(x => x.f >= UI.tD && x.f <= UI.tH)).length]).filter(([, n]) => n);
+  out.push(saltos.length ? ['bad', `Saldos que no siguen la secuencia en el estado de cuenta: ${saltos.map(([b, n]) => `${bancoN(b)} (${n})`).join(', ')}. Puede faltar un movimiento o haber un archivo incompleto.`, 'bancos'] : ['ok', 'Los saldos de los estados de cuenta siguen la secuencia sin saltos']);
+  const porConf = (ST.casos || []).filter(c => c.estado === 'corregido').length;
+  const vencidos = (ST.casos || []).filter(c => c.estado === 'pendiente' && E.dn(hoyF) - E.dn(String(c.created_at).slice(0, 10)) > 3).length;
+  out.push(porConf || vencidos ? ['warn', `Seguimiento: ${porConf} corregido${porConf === 1 ? '' : 's'} por confirmar · ${vencidos} pendiente${vencidos === 1 ? '' : 's'} con más de 3 días`, 'seguimiento'] : ['ok', 'Seguimiento al día']);
+  const R = referenciasRotas(); const nR = R.links.length + R.just.length;
+  if (nR) out.push(['warn', `${nR} vínculo${nR > 1 ? 's' : ''} o justifica${nR > 1 ? 'ciones' : 'ción'} apunta${nR > 1 ? 'n' : ''} a registros que ya no existen`, 'pend']);
+  const prev = mesContable(E.addDays(UI.tD, -1));
+  const sinAprobar = bancosActivos().filter(b => (ST.mov[b.id] || []).some(x => x.f >= prev.desde && x.f <= prev.hasta) && estadoCierre(cierreGuardado(b.id, prev.desde, prev.hasta)) !== 'aprobado');
+  out.push(sinAprobar.length ? ['warn', `Mes contable anterior sin cierre aprobado: ${sinAprobar.map(b => b.nombre).join(', ')}`, 'historial'] : ['ok', 'El mes contable anterior está cerrado y aprobado en todos los bancos']);
+  return out;
+}
+function vTablero() {
+  const hayDatos = Object.keys(ST.sis).length || Object.keys(ST.mov).some(k => (ST.mov[k] || []).length);
+  if (!hayDatos) return vInicio();
+  rangoTablero();
+  calcular(UI.tD, UI.tH);
+  const ids = Object.keys(RES);
+  const P = partidasAbiertas();
+  let nTot = 0, nPend = 0, nMan = 0, nJust = 0;
+  for (const id of ids) {
+    const r = RES[id]; nTot += r.tot.nS + r.tot.nB; nPend += r.tot.nPendS + r.tot.nPendB; nJust += r.justificados.length;
+    nMan += r.matches.filter(m => m.tipo === 'manual').reduce((a, m) => a + m.s.length + m.b.length, 0);
+  }
+  const pct = v => nTot ? Math.max(0, Math.min(100, Math.round(v / nTot * 1000) / 10)) : 100;
+  const pConc = pct(nTot - nPend), pAuto = pct(nTot - nPend - nMan - nJust);
+  const altos = P.filter(p => p.r.n === 3), montoAlto = altos.reduce((a, p) => a + p.x.monto, 0), montoAb = P.reduce((a, p) => a + p.x.monto, 0);
+  const casosAb = (ST.casos || []).filter(c => c.estado !== 'confirmado');
+  const conDatos = bancosActivos().filter(b => RES[b.id]);
+  const aprobados = conDatos.filter(b => estadoCierre(cierreGuardado(b.id, UI.tD, UI.tH)) === 'aprobado').length;
+  const esMes = (() => { const m = mesContable(UI.tD); return m.desde === UI.tD && m.hasta === UI.tH; })();
+  let h = `<div class="stack">
+  <div class="ph"><div><h2>Tablero de control</h2><p>${esMes ? esc(nombreMesContable(UI.tD)) : `${fdl(UI.tD)} al ${fdl(UI.tH)}`} · actualizado con lo cargado al ${fdl(hoy())}</p></div>
+    <div class="row" style="gap:4px;align-items:center"><button class="btn sm" data-act="tabMes" data-d="-1" aria-label="Mes contable anterior">‹</button><button class="btn sm" data-act="tabMes" data-d="0">Mes actual</button><button class="btn sm" data-act="tabMes" data-d="1" aria-label="Mes contable siguiente">›</button></div></div>
+  <div class="kpis">
+    <div class="kpi ${pConc >= 98 ? 'ok' : pConc >= 90 ? 'warn' : 'bad'}"><div class="l">Conciliado</div><div class="v">${nTot ? pConc + '%' : '—'}</div><div class="meter"><span style="width:${nTot ? pConc : 0}%"></span></div><div class="s">${nTot ? `${pAuto}% automático · ${nTot - nPend} de ${nTot} movimientos` : 'Sin movimientos en este período'}</div></div>
+    <div class="kpi ${nPend ? 'warn' : 'ok'}"><div class="l">Partidas abiertas</div><div class="v">${nPend}</div><div class="s num">${fmt(montoAb)}</div></div>
+    <div class="kpi ${altos.length ? 'bad' : 'ok'}"><div class="l">Riesgo alto</div><div class="v">${altos.length}</div><div class="s num">${fmt(montoAlto)}</div></div>
+    <div class="kpi ${aprobados === conDatos.length && conDatos.length ? 'ok' : ''}"><div class="l">Cierres aprobados</div><div class="v">${aprobados}/${conDatos.length}</div><div class="s">${casosAb.length} caso${casosAb.length === 1 ? '' : 's'} en seguimiento</div></div>
+  </div>`;
+  // Antigüedad
+  const B = AGING.map(() => ({ n: 0, m: 0, alto: 0 }));
+  P.forEach(p => { const o = B[p.r.b]; o.n++; o.m += p.x.monto; if (p.r.n === 3) o.alto++; });
+  const maxM = Math.max(1, ...B.map(o => o.m));
+  h += `<div class="grid2">
+    <div class="panel stack"><div class="colh" style="padding:0"><h3>Antigüedad de partidas abiertas</h3><span class="muted small">días desde la fecha del movimiento</span></div>
+      <div class="aging">${AGING.map(([, , l], i) => `<button class="ag-row" data-act="irAging" data-b="${i}"><span class="ag-l">${l}</span><span class="ag-bar"><span class="${i >= 3 ? 'bad' : i >= 1 ? 'warn' : ''}" style="width:${B[i].m / maxM * 100}%"></span></span><span class="ag-n num">${B[i].n}</span><span class="ag-m num">${fmt(B[i].m)}</span></button>`).join('')}</div>
+      <p class="small muted" style="margin:0">Una partida que pasa de 30 días sin resolver casi siempre es un error de registro o dinero que no va a aparecer. Resuélvala o envíela a seguimiento.</p></div>
+    <div class="panel stack"><div class="colh" style="padding:0"><h3>Controles</h3><span class="muted small">revisión automática</span></div>
+      <ul class="checks">${controlesTablero(diasRango(UI.tD, UI.tH)).map(([c, t, ir]) => `<li class="${c}"><span class="ico" aria-hidden="true">${c === 'ok' ? '✓' : '!'}</span><span>${esc(t)}</span>${c !== 'ok' && ir ? `<button class="btn sm" data-act="irControl" data-k="${ir}">Ver</button>` : ''}</li>`).join('')}</ul></div>
+  </div>`;
+  // Bancos
+  h += `<div class="panel stack"><div class="colh" style="padding:0"><h3>Estado por banco</h3><span class="muted small">clic en un banco para conciliarlo</span></div><div class="tw"><table class="bancos-t"><thead><tr><th>Banco</th><th>Estado de cuenta</th><th>Reporte del sistema</th><th class="r">Conciliado</th><th class="r">Abiertas</th><th class="r">Riesgo alto</th><th>Cierre del período</th><th></th></tr></thead><tbody>`;
+  for (const b of bancosActivos()) {
+    const r = RES[b.id]; if (!r) continue;
+    const n = r.tot.nS + r.tot.nB, np = r.tot.nPendS + r.tot.nPendB;
+    const pb = n ? Math.round((n - np) / n * 1000) / 10 : 100;
+    const ue = ultimoEstado(b.id), ur = ultimoReporte(b.id);
+    const pa = P.filter(p => p.bid === b.id && p.r.n === 3);
+    const c = cierreGuardado(b.id, UI.tD, UI.tH), ec = estadoCierre(c);
+    const pc = ec === 'aprobado' ? `<span class="pill ok">Aprobado</span><div class="sub">${esc(c.datos.aprobado_por || '')}</div>` : ec === 'reabierto' ? '<span class="pill warn">Reabierto</span>' : ec ? `<span class="pill acc">Preparado</span>${Math.abs(+c.diferencia) >= 0.005 ? `<div class="sub out">Dif. ${fmt(+c.diferencia)}</div>` : ''}` : '<span class="pill">Sin cierre</span>';
+    h += `<tr><td><b>${esc(b.nombre)}</b></td>
+      <td>${ue ? fdl(ue) : '<span class="pill bad">Sin cargar</span>'}${ue && ue < E.addDays(hoy(), -3) ? ' <span class="pill warn">Atrasado</span>' : ''}</td>
+      <td>${ur ? fdl(ur) : '—'}</td>
+      <td class="r"><span class="num">${pb}%</span><div class="meter sm"><span style="width:${pb}%"></span></div></td>
+      <td class="r num">${np}<div class="sub">${fmt(r.tot.pendS + r.tot.pendB)}</div></td>
+      <td class="r num ${pa.length ? 'out' : ''}">${pa.length}</td>
+      <td>${pc}</td>
+      <td><div class="row" style="gap:6px;flex-wrap:nowrap"><button class="btn sm" data-act="irBanco" data-b="${b.id}">Conciliar</button><button class="btn sm ghost" data-act="irCierre" data-b="${b.id}">Cierre</button></div></td></tr>`;
+  }
+  h += `</tbody></table></div></div>`;
+  // Cobertura
+  const dias = diasRango(UI.tD, UI.tH), hoyF = hoy();
+  h += `<div class="panel stack"><div class="colh" style="padding:0"><h3>Cobertura día por día</h3><span class="muted small">clic en un día para revisarlo</span></div>
+    <div class="cal-wrap"><div class="cal" style="grid-template-columns:96px repeat(${dias.length},minmax(22px,1fr))"><div></div>${dias.map(f => `<div class="cal-h ${esFinde(f) ? 'we' : ''}">${f.slice(8, 10)}<span>${DIAS[E.dow(E.dn(f))].slice(0, 1)}</span></div>`).join('')}`;
+  for (const b of bancosActivos()) {
+    const r = RES[b.id]; if (!r) continue;
+    const dm = Object.fromEntries(r.dias.map(d => [d.f, d])); const ue = ultimoEstado(b.id);
+    h += `<div class="cal-b">${esc(b.nombre)}</div>`;
+    for (const f of dias) {
+      const d = dm[f]; const lock = cierreAprobado(b.id, f) ? ' lock' : '';
+      let cls, tit, txt = '';
+      if (f > hoyF) { cls = 'fut'; tit = 'Día futuro'; }
+      else if (!ST.sis[f] && !esFinde(f) && !feriadosEfectivos().includes(f)) { cls = 'nosis'; tit = 'Sin reporte del sistema'; }
+      else if (!ue || f > ue) { cls = 'noban'; tit = 'El estado de cuenta todavía no llega a este día'; }
+      else if (d && d.pendS + d.pendB) { cls = 'pend'; tit = `${d.pendS + d.pendB} partida(s) abierta(s)`; txt = d.pendS + d.pendB; }
+      else if (d) { cls = 'ok'; tit = 'Todo conciliado'; }
+      else { cls = 'vac'; tit = 'Sin movimientos'; }
+      h += `<button class="cal-c ${cls}${lock}" data-act="irDia" data-b="${b.id}" data-f="${f}" title="${esc(b.nombre)} · ${fdl(f)}: ${tit}${lock ? ' · período cerrado' : ''}"${cls === 'fut' ? ' disabled' : ''}>${txt}</button>`;
+    }
+  }
+  h += `</div></div><div class="cal-ley small muted"><span><i class="cal-c ok"></i>Conciliado</span><span><i class="cal-c pend"></i>Con partidas abiertas</span><span><i class="cal-c noban"></i>Falta estado de cuenta</span><span><i class="cal-c nosis"></i>Falta reporte del sistema</span><span><i class="cal-c vac"></i>Sin movimientos</span><span><i class="cal-c ok lock"></i>Período cerrado</span></div></div>`;
+  // Atención prioritaria
+  const top = P.slice().sort(ordenRiesgo).slice(0, 12); const CA = casosAbiertosPorItem();
+  h += `<div class="panel stack"><div class="colh" style="padding:0"><h3>Atención prioritaria</h3><span class="muted small">las partidas que más pueden costar si no se resuelven</span></div>`;
+  h += top.length ? `<div class="tw"><table><thead><tr><th>Riesgo</th><th>Banco</th><th>Fecha</th><th>Descripción</th><th class="r">Monto</th><th></th></tr></thead><tbody>${top.map(p => `<tr><td>${pillRiesgo(p.r)}<div class="sub">${esc(p.r.cat)}</div></td><td>${esc(bancoN(p.bid))}</td><td class="nw">${fd(p.x.f)}<div class="sub">${textoEdad(p.r.edad)}</div></td><td>${p.x.lado === 's' ? `<b>${esc(p.x.doc)}</b> ` : ''}${esc(p.x.desc)}${p.r.alto ? ' <span class="pill bad">Alto valor</span>' : ''}${CA[p.x.id] ? ' ' + pillCaso(CA[p.x.id]) : ''}</td><td class="r num ${p.x.dir}">${p.x.dir === 'out' ? '−' : ''}${fmt(p.x.monto)}</td><td><button class="btn sm" data-act="abrirItem" data-id="${esc(p.x.id)}" data-b="${p.bid}">Abrir</button></td></tr>`).join('')}</tbody></table></div>` : `<div class="empty">No hay partidas abiertas en este período.</div>`;
+  return h + `</div></div>`;
 }
 
 /* ================== Conciliar ================== */
@@ -937,10 +1208,11 @@ async function migrarIds() {
   if (n) toast(`Se actualizaron ${n} referencias al formato nuevo`);
 }
 const feriadosEfectivos = () => [...new Set([...(ST.cfg.feriados || []), ...(ST.feriadosBase || []).map(f => f.fecha)])].sort();
-function calcular() {
+function calcular(d0, h0) {
   rangoDefecto();
   RES = {};
-  const desde = UI.desde <= UI.hasta ? UI.desde : UI.hasta, hasta = UI.desde <= UI.hasta ? UI.hasta : UI.desde;
+  const a = d0 || UI.desde, z = h0 || UI.hasta;
+  const desde = a <= z ? a : z, hasta = a <= z ? z : a;
   UI.rD = desde; UI.rH = hasta;
   for (const b of bancosActivos()) {
     const tieneSis = Object.values(ST.sis).some(d => d.secciones && d.secciones[b.id] && d.secciones[b.id].items.length);
@@ -1012,16 +1284,19 @@ function filaMonto(l, v, cls = '', extra = '') { return `<tr class="${cls}"><td>
 function vCierre(r) {
   const c = datosCierre(r.bancoId); if (!c) return '';
   const ok = Math.abs(c.resid) < 0.005;
-  const inp = (k, val, ph) => `<input type="text" inputmode="decimal" data-cierre="${k}" value="${esc(val ?? '')}" placeholder="${esc(ph)}">`;
+  const g = c.guardado, est = estadoCierre(g), aprobado = est === 'aprobado';
+  const falta = bloqueosCierre(c);
+  const inp = (k, val, ph) => `<input type="text" inputmode="decimal" data-cierre="${k}" value="${esc(val ?? '')}" placeholder="${esc(ph)}" ${aprobado ? 'disabled' : ''}>`;
   const nombre = mesContableActivo() ? nombreMesContable(c.desde) : `${fdl(c.desde)} al ${fdl(c.hasta)}`;
   let h = `<div class="stack">
   <div class="row" style="justify-content:space-between;align-items:center">
     <div><h3 style="font-size:17px">${esc(bancoN(c.bid))} · ${esc(nombre)}</h3>
-    <div class="small muted">${c.guardado ? `Cierre guardado el ${fdl(String(c.guardado.created_at).slice(0, 10))}${c.guardado.created_by ? ' por ' + esc(c.guardado.created_by) : ''}` : 'Sin cierre guardado para este período'}</div></div>
+    <div class="small muted">${g ? lineaCierre(g) : 'Sin cierre guardado para este período'}</div></div>
     ${(() => { const faltan = c.supuestoIni || num(c.I.librosFin) == null;
       if (!ok) return `<span class="pill bad" style="font-size:14px;padding:6px 12px">Diferencia sin explicar ${fmt(c.resid)}</span>`;
       if (faltan) return `<span class="pill warn" style="font-size:14px;padding:6px 12px">Falta escribir el saldo ${c.supuestoIni ? 'inicial' : 'final'} del sistema</span>`;
       return `<span class="pill ok" style="font-size:14px;padding:6px 12px">Cuadra</span>`; })()}
+    ${pillEstadoCierre(g, true)}
   </div>
   <div class="grid2">
     <div class="panel stack"><h3 style="font-size:15px">Saldos</h3>
@@ -1059,10 +1334,54 @@ function vCierre(r) {
     <div class="tw" style="margin-top:8px"><table><thead><tr><th>Origen</th><th>Fecha</th><th>Descripción</th><th class="r">Monto</th></tr></thead><tbody>
     ${[...c.pendS, ...c.pendB].map(x => `<tr><td>${x.lado === 's' ? 'Sistema' : 'Banco'}${ST.man.just[x.id] ? ' <span class="pill">Justificado</span>' : ''}</td><td>${fdl(x.f)}</td><td>${esc((x.doc ? x.doc + ' ' : '') + x.desc)}${ST.man.just[x.id]?.nota ? `<div class="sub">${esc(ST.man.just[x.id].nota)}</div>` : ''}</td><td class="r num ${x.dir}">${fmt(sgn(x))}</td></tr>`).join('') || '<tr><td colspan="4" class="empty">Sin partidas pendientes</td></tr>'}
     </tbody></table></div></details>
-  <div class="row"><input type="text" id="cierreNota" value="${esc(c.I.nota || '')}" placeholder="Nota del cierre (opcional)" style="flex:1;min-width:200px">
-    <button class="btn pri" data-act="guardarCierre">${c.guardado ? 'Actualizar cierre' : 'Guardar cierre'}</button></div>
+  ${vAccionesCierre(c, g, est, falta)}
   </div>`;
   return h;
+}
+function pillEstadoCierre(g, grande) {
+  const e = estadoCierre(g); const st = grande ? ' style="font-size:14px;padding:6px 12px"' : '';
+  if (e === 'aprobado') return `<span class="pill ok"${st}>Aprobado y cerrado</span>`;
+  if (e === 'reabierto') return `<span class="pill warn"${st}>Reabierto</span>`;
+  if (e) return `<span class="pill acc"${st}>Preparado · falta aprobar</span>`;
+  return '';
+}
+function lineaCierre(g) {
+  const d = g.datos || {}; const f = x => fdl(String(x).slice(0, 10));
+  const prep = `Preparado por ${esc(d.preparado_por || g.created_by || '—')} el ${f(d.preparado_at || g.created_at)}`;
+  if (d.estado === 'aprobado') return `${prep} · aprobado por <b>${esc(d.aprobado_por || '—')}</b> el ${f(d.aprobado_at)}`;
+  if (d.estado === 'reabierto') return `${prep} · reabierto por ${esc(d.reabierto_por || '—')} el ${f(d.reabierto_at)}: “${esc(d.motivo_reapertura || '')}”`;
+  return prep;
+}
+/* Lo que falta para poder aprobar el cierre (buenas prácticas: cuadre exacto, estado de cuenta completo, saldo independiente del sistema y doble firma si se configuró) */
+function bloqueosCierre(c) {
+  const out = [];
+  if (Math.abs(c.resid) >= 0.005) out.push(`La diferencia sin explicar debe ser cero (ahora ${fmt(c.resid)})`);
+  if (Math.abs(c.checkBanco) >= 0.005) out.push('El estado de cuenta no cuadra: saldo inicial + movimientos ≠ saldo final');
+  if (!c.ultimoBanco || c.ultimoBanco < c.hasta) out.push(`El estado de cuenta debe llegar al ${fdl(c.hasta)}`);
+  if (c.supuestoIni) out.push('Escriba el saldo inicial del sistema');
+  if (num(c.I.librosFin) == null) out.push('Escriba el saldo final que muestra su sistema (no el calculado)');
+  const g = c.guardado; const prep = g && (g.datos?.preparado_por || g.created_by);
+  if (CTRL().aprobOtro && prep && prep === usr() && estadoCierre(g) !== 'aprobado') out.push('Lo debe aprobar una persona distinta a quien lo preparó');
+  return out;
+}
+function vAccionesCierre(c, g, est, falta) {
+  const hist = (g?.datos?.historial || []).slice().reverse();
+  const histH = hist.length ? `<details><summary>Historial del cierre (${hist.length})</summary><ul class="hist">${hist.map(x => `<li><b>${esc({ preparado: 'Preparado', actualizado: 'Actualizado', aprobado: 'Aprobado', reabierto: 'Reabierto' }[x.accion] || x.accion)}</b> · ${fdl(String(x.ts).slice(0, 10))} ${String(x.ts).slice(11, 16)} · ${esc(x.por || '')}${x.nota ? ` — ${esc(x.nota)}` : ''}</li>`).join('')}</ul></details>` : '';
+  if (est === 'aprobado') {
+    return `<div class="lockban" style="justify-content:space-between"><span><b>Período cerrado.</b> ${lineaCierre(g)}. Nada de este banco en el período se puede cambiar.</span>
+      ${UI.reabrir ? '' : `<button class="btn sm" data-act="reabrirAbrir">Reabrir período</button>`}</div>
+      ${UI.reabrir ? `<div class="panel stack"><b>Reabrir ${esc(bancoN(c.bid))} · ${esc(nombrePeriodo(c.desde, c.hasta))}</b><p class="small muted" style="margin:0">Reabrir permite volver a cambiar el período. El motivo queda registrado en el historial y en la bitácora; luego hay que aprobarlo de nuevo.</p>
+        <input type="text" id="motivoReabrir" placeholder="Motivo (obligatorio): por ejemplo, el banco reversó un depósito del 15/09">
+        <div class="row"><button class="btn danger" data-act="reabrirCierre">Reabrir</button><button class="btn ghost" data-act="reabrirCancelar">Cancelar</button></div></div>` : ''}
+      ${histH}`;
+  }
+  return `<div class="panel stack"><h3 style="font-size:15px">Preparar y aprobar</h3>
+    <ol class="flujo"><li><b>Preparar:</b> revise saldos y partidas y guarde el cierre.</li><li><b>Aprobar:</b> ${CTRL().aprobOtro ? 'otra persona' : 'usted u otra persona'} revisa y aprueba. Al aprobar, el período queda cerrado y nadie puede cambiar lo que cae en él.</li></ol>
+    ${falta.length ? `<ul class="checks">${falta.map(t => `<li class="warn"><span class="ico">!</span><span>${esc(t)}</span></li>`).join('')}</ul>` : '<ul class="checks"><li class="ok"><span class="ico">✓</span><span>Listo para aprobar</span></li></ul>'}
+    <div class="row"><input type="text" id="cierreNota" value="${esc(c.I.nota || '')}" placeholder="Nota del cierre (opcional)" style="flex:1;min-width:200px">
+      <button class="btn" data-act="guardarCierre">${g ? 'Actualizar cierre' : 'Guardar cierre'}</button>
+      <button class="btn pri" data-act="aprobarCierre" ${falta.length ? 'disabled' : ''}>Aprobar y cerrar período</button></div>
+    ${histH}</div>`;
 }
 function snapshotCierre(c) {
   return { desde: c.desde, hasta: c.hasta, bancoIni: c.bancoIni, bancoFin: c.bancoFin, librosIni: c.librosIni, librosFin: c.librosFin, librosCalc: c.librosCalc,
@@ -1090,14 +1409,14 @@ function vHistorial() {
   const orden = ST.cfg.bancos.map(b => b.id);
   cs.sort((a, b) => orden.indexOf(a.banco) - orden.indexOf(b.banco) || (a.desde < b.desde ? 1 : -1));
   let h = `<div class="stack"><div class="panel stack"><h2 style="font-size:18px">Historial de cierres</h2>
-    <p class="muted small" style="margin:0;max-width:70ch">Cada cierre guarda los saldos, el estado de conciliación y las partidas pendientes de ese momento. Para hacer uno, en Conciliar elija el banco y el período y abra la pestaña Cierre.</p>`;
+    <p class="muted small" style="margin:0;max-width:75ch">Cada cierre guarda los saldos, el estado de conciliación y las partidas pendientes de ese momento. Primero se <b>prepara</b> y luego se <b>aprueba</b>; al aprobarlo, el período queda cerrado y nada de lo que cae en él se puede cambiar sin reabrirlo con un motivo.</p>`;
   if (!cs.length) return h + `<p class="muted" style="margin:0">Todavía no hay cierres guardados.</p></div></div>`;
-  h += `<div class="tw"><table><thead><tr><th>Banco</th><th>Período</th><th class="r">Saldo banco</th><th class="r">Saldo sistema</th><th class="r">Pendientes</th><th>Resultado</th><th>Guardado</th><th></th></tr></thead><tbody>`;
+  h += `<div class="tw"><table><thead><tr><th>Banco</th><th>Período</th><th class="r">Saldo banco</th><th class="r">Saldo sistema</th><th class="r">Pendientes</th><th>Resultado</th><th>Estado</th><th></th></tr></thead><tbody>`;
   for (const c of cs) {
     const d = c.datos; const ok = Math.abs(+c.diferencia) < 0.005;
     h += `<tr><td><b>${esc(bancoN(c.banco))}</b></td><td>${esc(nombrePeriodo(c.desde, c.hasta))}</td><td class="r num">${fmt(d.bancoFin)}</td><td class="r num">${fmt(d.librosFin)}</td><td class="r num">${(d.partidas || []).length}</td>
       <td>${ok ? '<span class="pill ok">Cuadra</span>' : `<span class="pill bad">Dif. ${fmt(+c.diferencia)}</span>`}</td>
-      <td class="small">${fdl(String(c.created_at).slice(0, 10))}<div class="sub">${esc(c.created_by || '')}</div></td>
+      <td class="small">${pillEstadoCierre(c) || '<span class="pill acc">Preparado</span>'}<div class="sub">${estadoCierre(c) === 'aprobado' ? esc(c.datos.aprobado_por || '') + ' · ' + fdl(String(c.datos.aprobado_at).slice(0, 10)) : esc(c.datos.preparado_por || c.created_by || '') + ' · ' + fdl(String(c.datos.preparado_at || c.created_at).slice(0, 10))}</div></td>
       <td><div class="row" style="gap:6px;flex-wrap:nowrap"><button class="btn sm" data-act="verCierre" data-id="${c.id}">${UI.verCierre == c.id ? 'Ocultar' : 'Ver'}</button><button class="btn sm" data-act="abrirCierre" data-id="${c.id}">Abrir</button></div></td></tr>`;
     if (UI.verCierre == c.id) {
       h += `<tr><td colspan="8" style="background:var(--sunk)"><div class="stack">
@@ -1107,7 +1426,9 @@ function vHistorial() {
         <div class="tw"><table><thead><tr><th>Origen</th><th>Fecha</th><th>Descripción</th><th class="r">Monto</th></tr></thead><tbody>
           ${(d.partidas || []).map(x => `<tr><td>${x.lado === 's' ? 'Sistema' : 'Banco'}${x.just ? ' <span class="pill">Justificado</span>' : ''}</td><td>${fdl(x.f)}</td><td>${esc((x.doc ? x.doc + ' ' : '') + x.desc)}${x.nota ? `<div class="sub">${esc(x.nota)}</div>` : ''}</td><td class="r num ${x.dir}">${fmt(x.dir === 'in' ? x.monto : -x.monto)}</td></tr>`).join('') || '<tr><td colspan="4" class="empty">Sin partidas pendientes</td></tr>'}
         </tbody></table></div>
-        <div class="row">${UI.confirm === 'cierre:' + c.id ? `<span class="confirm">¿Borrar este cierre? <button class="btn sm danger" data-act="borrarCierre" data-id="${c.id}">Sí, borrar</button><button class="btn sm" data-act="cancelConfirm">No</button></span>` : `<button class="btn sm ghost danger" data-act="confirm" data-k="cierre:${c.id}">Borrar cierre</button>`}</div>
+        <div class="small">${lineaCierre(c)}</div>
+        ${(c.datos.historial || []).length ? `<ul class="hist">${c.datos.historial.slice().reverse().map(x => `<li><b>${esc(x.accion)}</b> · ${fdl(String(x.ts).slice(0, 10))} · ${esc(x.por || '')}${x.nota ? ' — ' + esc(x.nota) : ''}</li>`).join('')}</ul>` : ''}
+        <div class="row">${estadoCierre(c) === 'aprobado' ? '<span class="small muted">Para borrarlo o cambiarlo, primero reábralo desde Conciliar → Cierre.</span>' : UI.confirm === 'cierre:' + c.id ? `<span class="confirm">¿Borrar este cierre? <button class="btn sm danger" data-act="borrarCierre" data-id="${c.id}">Sí, borrar</button><button class="btn sm" data-act="cancelConfirm">No</button></span>` : `<button class="btn sm ghost danger" data-act="confirm" data-k="cierre:${c.id}">Borrar cierre</button>`}</div>
       </div></td></tr>`;
     }
   }
@@ -1679,29 +2000,62 @@ function flagHtml(x) {
     return '';
   }).join('');
 }
-function itemHtml(x, lado) {
+function itemHtml(x, lado, CA) {
   const sel = UI.sel.has(x.id);
+  const rk = riesgo(x), lock = cierreDeIds([x.id]);
   const dirTxt = x.dir === 'in' ? 'Ingreso' : 'Egreso';
   const desc = lado === 's' ? `<b>${esc(x.doc)}</b> ${esc(x.desc)}` : esc(x.desc);
-  const meta = lado === 's' ? `${fd(x.f)} · ${dirTxt}` : `${fd(x.f)} · ${dirTxt}${x.cod ? ' · ' + esc(x.cod) : ''}${x.ref ? ' · Ref ' + esc(x.ref) : ''}${x.agencia ? ' · ' + esc(x.agencia) : ''}`;
-  const fl = (lado === 'b' && esCargo(x) ? '<span class="pill acc">Cargo bancario</span>' : '') + flagHtml(x);
-  return `<div class="item ${sel ? 'sel' : ''}">
-    <input type="checkbox" data-act="sel" data-id="${esc(x.id)}" ${sel ? 'checked' : ''} aria-label="Seleccionar">
+  const meta = (lado === 's' ? `${fd(x.f)} · ${dirTxt}` : `${fd(x.f)} · ${dirTxt}${x.cod ? ' · ' + esc(x.cod) : ''}${x.ref ? ' · Ref ' + esc(x.ref) : ''}${x.agencia ? ' · ' + esc(x.agencia) : ''}`) + ` · <span class="${rk.edad > 30 ? 'out' : ''}">${textoEdad(rk.edad)}</span>`;
+  const rp = (rk.n >= 2 ? `<span class="pill ${NIVEL[rk.n][0]}">${NIVEL[rk.n][1]} · ${esc(rk.cat)}</span>` : '') + (rk.alto ? '<span class="pill bad">Alto valor</span>' : '');
+  const fl = rp + (lado === 'b' && esCargo(x) ? '<span class="pill acc">Cargo bancario</span>' : '') + flagHtml(x);
+  const c = (CA || casosAbiertosPorItem())[x.id];
+  const acts = lock ? `${c ? pillCaso(c) : ''}${rp}<span class="pill acc">Período cerrado</span>`
+    : UI.justAbierto === x.id ? formJust(x.id, '') : UI.casoAbierto === x.id ? formCaso(x)
+    : `${c ? pillCaso(c) : ''}${fl}${c ? '' : `<button class="btn sm" data-act="abrirCaso" data-id="${esc(x.id)}">Enviar a corrección${x.lado === 's' ? ' o revisión' : ''}</button>`}<button class="btn sm ghost" data-act="justificar" data-id="${esc(x.id)}">Justificar</button>`;
+  return `<div class="item r${rk.n} ${sel ? 'sel' : ''}" data-item="${esc(x.id)}">
+    <input type="checkbox" data-act="sel" data-id="${esc(x.id)}" ${sel ? 'checked' : ''} ${lock ? 'disabled' : ''} aria-label="Seleccionar">
     <div class="main"><div class="d">${desc}</div><div class="meta">${meta}</div></div>
-    <div class="amt num ${x.dir}">${x.dir === 'out' ? '−' : ''}${fmt(x.monto).replace('L ', 'L ')}</div>
-    <div class="acts">${UI.justAbierto === x.id ? formJust(x.id, '') : UI.casoAbierto === x.id ? formCaso(x) : (() => { const c = casosAbiertosPorItem()[x.id]; return `${c ? pillCaso(c) : ''}${fl}${c ? '' : `<button class="btn sm" data-act="abrirCaso" data-id="${esc(x.id)}">Enviar a corrección${x.lado === 's' ? ' o revisión' : ''}</button>`}<button class="btn sm ghost" data-act="justificar" data-id="${esc(x.id)}">Justificar</button>`; })()}</div>
+    <div class="amt num ${x.dir}">${x.dir === 'out' ? '−' : ''}${fmt(x.monto)}</div>
+    <div class="acts">${acts}</div>
   </div>`;
 }
+const ORDENES = { riesgo: 'Riesgo', fecha: 'Fecha', monto: 'Monto' };
+function ordenarPend(arr) {
+  const m = arr.map(x => ({ x, r: riesgo(x) }));
+  const f = UI.pFil;
+  const fil = m.filter(o => (f.b < 0 || o.r.b === f.b) && (!f.alto || o.r.n === 3));
+  if (UI.pOrd === 'riesgo') fil.sort(ordenRiesgo);
+  else if (UI.pOrd === 'monto') fil.sort((a, b) => b.x.monto - a.x.monto);
+  else fil.sort((a, b) => a.x.f < b.x.f ? -1 : a.x.f > b.x.f ? 1 : b.x.monto - a.x.monto);
+  return fil.map(o => o.x);
+}
+function vLockBanner(bid) {
+  const cs = (ST.cierres || []).filter(c => c.banco === bid && estadoCierre(c) === 'aprobado' && c.desde <= UI.rH && c.hasta >= UI.rD);
+  if (!cs.length) return '';
+  const c = cs[0];
+  return `<div class="lockban"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg><span><b>${esc(nombrePeriodo(c.desde, c.hasta))} está cerrado y aprobado</b>${c.datos.aprobado_por ? ' por ' + esc(c.datos.aprobado_por) : ''}${c.datos.aprobado_at ? ' el ' + fdl(String(c.datos.aprobado_at).slice(0, 10)) : ''}. Lo que cae en ese período no se puede vincular, justificar ni modificar.</span><button class="btn sm" data-act="vista" data-k="cierre">Ver cierre</button></div>`;
+}
 function vPendientes(r) {
-  const col = (titulo, nota, arr, lado) => `<div><div class="colh"><h3>${titulo}</h3><span class="muted small">${nota}</span></div>
-    <div class="list">${arr.length ? arr.map(x => itemHtml(x, lado)).join('') : `<div class="empty">Nada pendiente aquí.</div>`}</div></div>`;
+  const CA = casosAbiertosPorItem();
+  const todos = [...r.soloSis, ...r.soloBan].map(x => riesgo(x));
+  const nB = AGING.map((_, i) => todos.filter(k => k.b === i).length), nAlto = todos.filter(k => k.n === 3).length;
+  const ss = ordenarPend(r.soloSis), bb = ordenarPend(r.soloBan);
+  const filtrado = UI.pFil.b >= 0 || UI.pFil.alto;
+  const col = (titulo, nota, arr, total, lado) => `<div><div class="colh"><h3>${titulo}${filtrado ? ` <span class="muted small">${arr.length} de ${total}</span>` : ''}</h3><span class="muted small">${nota}</span></div>
+    <div class="list">${arr.length ? arr.map(x => itemHtml(x, lado, CA)).join('') : `<div class="empty">${filtrado ? 'Nada con este filtro.' : 'Nada pendiente aquí.'}</div>`}</div></div>`;
   const otros = r.soloSis.filter(x => (x.flags || []).some(f => f.t === 'otroBanco'));
-  let h = vRotas();
+  let h = vLockBanner(r.bancoId) + vRotas();
   h += otros.length ? `<div class="banner ex" style="justify-content:space-between">${otros.length} registro${otros.length > 1 ? 's' : ''} del sistema aparece${otros.length > 1 ? 'n' : ''} en otro banco (${fmt(otros.reduce((a, x) => a + x.monto, 0))}).
     ${UI.confirm === 'moverTodos' ? `<span class="row" style="gap:6px">¿Moverlos todos al banco donde aparecen? <button class="btn sm pri" data-act="moverTodos">Sí, mover ${otros.length}</button><button class="btn sm" data-act="cancelConfirm">No</button></span>` : `<button class="btn sm" data-act="confirm" data-k="moverTodos">Mover todos al banco correcto</button>`}</div>` : '';
+  h += `<div class="ptools"><div class="fchips" role="group" aria-label="Filtrar por antigüedad">
+      <button class="fchip" data-act="pFil" data-b="-1" aria-pressed="${UI.pFil.b < 0}">Todas<span class="num">${todos.length}</span></button>
+      ${AGING.map(([, , l], i) => nB[i] ? `<button class="fchip" data-act="pFil" data-b="${i}" aria-pressed="${UI.pFil.b === i}">${l}<span class="num">${nB[i]}</span></button>` : '').join('')}
+      ${nAlto ? `<button class="fchip bad" data-act="pAlto" aria-pressed="${UI.pFil.alto}">Solo riesgo alto<span class="num">${nAlto}</span></button>` : ''}
+    </div>
+    <label class="row small muted" style="gap:6px;align-items:center">Ordenar por <select id="pOrd">${Object.entries(ORDENES).map(([k, l]) => `<option value="${k}" ${UI.pOrd === k ? 'selected' : ''}>${l}</option>`).join('')}</select></label></div>`;
   h += `<div class="cols">
-    ${col('En el sistema, no en el banco', 'Registrado pero no llegó, o llegó con otro monto o fecha', r.soloSis, 's')}
-    ${col('En el banco, no en el sistema', 'Depósitos o cargos que nadie registró', r.soloBan, 'b')}
+    ${col('En el sistema, no en el banco', 'Registrado pero no llegó, o llegó con otro monto o fecha', ss, r.soloSis.length, 's')}
+    ${col('En el banco, no en el sistema', 'Depósitos o cargos que nadie registró', bb, r.soloBan.length, 'b')}
   </div>`;
   h += selBar(r);
   return h;
@@ -1760,6 +2114,7 @@ const filaCargo = o => [bancoN(o.banco), fdl(o.f), o.desc, m2(o.total)].join('\t
 /* Agrega los grupos marcados como registrados a los registros del sistema de su fecha */
 async function registrarCargos(gs) {
   if (!gs.length) return;
+  if (bloqueadoBF(gs.map(o => [o.banco, o.f]))) return;
   const porFecha = {};
   for (const o of gs) (porFecha[o.f] ||= []).push(o);
   let n = 0;
@@ -1962,7 +2317,8 @@ async function guardarImport() {
   const ids = new Set(arr.map(x => x.id));
   const base = Date.now() * 1000;
   const nuevos = [];
-  items.forEach((it, i) => { it.orden = base + i; if (!ids.has(it.id)) { nuevos.push(it); ids.add(it.id); } });
+  let enCerrado = 0;
+  items.forEach((it, i) => { it.orden = base + i; if (ids.has(it.id)) return; if (cierreAprobado(banco, it.f)) { enCerrado++; return; } nuevos.push(it); ids.add(it.id); });
   I.guardando = true; render();
   try {
     await dbMovs(banco, nuevos);
@@ -1973,7 +2329,7 @@ async function guardarImport() {
   const fs = items.map(x => x.f).sort();
   if (fs.length && !Object.keys(ST.sis).length) { UI.desde = fs[fs.length - 1]; UI.hasta = fs[fs.length - 1]; }
   if (fs.length && ST.movDesde && fs[0] < ST.movDesde) ST.movDesde = fs[0];
-  toast(`${bancoN(banco)}: ${nuevos.length} movimientos nuevos guardados`);
+  toast(`${bancoN(banco)}: ${nuevos.length} movimientos nuevos guardados${enCerrado ? ` · ${enCerrado} de períodos cerrados no se tocaron` : ''}`);
   render();
 }
 
@@ -2049,6 +2405,15 @@ function vAjustes() {
     <div class="panel stack"><h2 style="font-size:18px">Tolerancia de centavos</h2>
       <p class="muted small" style="margin:0">Diferencias de hasta este monto entre el sistema y el banco se concilian solas y quedan marcadas como "Diferencia de centavos". Use 0 para desactivarlo.</p>
       <div class="row"><label class="f">Hasta (L)<input type="number" id="tolerancia" min="0" max="50" step="0.01" value="${ST.cfg.tolerancia ?? 1}" style="width:120px"></label><button class="btn" data-act="guardarTolerancia">Guardar</button></div></div>
+    <div class="panel stack"><h2 style="font-size:18px">Controles y riesgo</h2>
+      <p class="muted small" style="margin:0">Definen qué partidas se marcan como riesgo alto en el Tablero y en Pendientes, y quién puede aprobar un cierre.</p>
+      <div class="row">
+        <label class="f">Monto de alto valor (L)<input type="number" id="cUmbral" min="0" step="100" value="${CTRL().umbral}" style="width:150px"></label>
+        <label class="f">Días que puede tardar un pago en verse en el banco<input type="number" id="cTransito" min="0" max="15" value="${CTRL().transito}" style="width:150px"></label>
+      </div>
+      <label class="row small" style="gap:8px;align-items:center"><input type="checkbox" id="cAprobOtro" ${CTRL().aprobOtro ? 'checked' : ''}> El cierre lo debe aprobar una persona distinta a quien lo preparó</label>
+      <p class="small muted" style="margin:0">Recomendado cuando haya dos o más personas con acceso (se agregan en la tabla cb_usuarios de Supabase).</p>
+      <div class="row"><button class="btn" data-act="guardarControles">Guardar controles</button></div></div>
     <div class="panel stack"><h2 style="font-size:18px">Feriados</h2>
       <p class="muted small" style="margin:0">Un feriado se trata como día no hábil: lo que se registre ese día puede aparecer en el banco el siguiente día hábil.</p>
       ${(ST.feriadosBase || []).length ? `<div class="small"><b>Del calendario de feriados (VerifiCrédito):</b> ${ST.feriadosBase.map(f => `${fdl(f.fecha)}${f.descripcion ? ' ' + esc(f.descripcion) : ''}`).join(' · ')}</div>` : ''}
@@ -2138,6 +2503,22 @@ document.addEventListener('click', e => {
     ir: () => { UI.tab = el.dataset.tab; render(); },
     banco: () => { UI.banco = el.dataset.id; UI.sel.clear(); render(); },
     vista: () => { UI.vista = el.dataset.k; render(); },
+    pFil: () => { UI.pFil.b = +el.dataset.b; render(); },
+    pAlto: () => { UI.pFil.alto = !UI.pFil.alto; render(); },
+    tema: () => { TEMA = { auto: 'light', light: 'dark', dark: 'auto' }[TEMA]; try { localStorage.setItem('concilia.tema', TEMA); } catch (e) {} aplicarTema(); renderSide(); },
+    tabMes: () => {
+      const d = +el.dataset.d;
+      if (!d) { const m = mesContable(hoy()); UI.tD = m.desde; UI.tH = m.hasta; return render(); }
+      const y = +UI.tD.slice(0, 4), mo = +UI.tD.slice(5, 7) + d;
+      const m = mesContable(new Date(Date.UTC(y, mo - 1, 9)).toISOString().slice(0, 10));
+      UI.tD = m.desde; UI.tH = m.hasta; render(); asegurarMovs(UI.tD).then(render);
+    },
+    irBanco: () => { UI.banco = el.dataset.b; UI.desde = UI.tD; UI.hasta = UI.tH; UI.vista = 'pend'; UI.tab = 'conciliar'; UI.sel.clear(); render(); window.scrollTo({ top: 0 }); },
+    irCierre: () => { UI.banco = el.dataset.b; UI.desde = UI.tD; UI.hasta = UI.tH; UI.vista = 'cierre'; UI.tab = 'conciliar'; render(); window.scrollTo({ top: 0 }); },
+    irDia: () => { UI.banco = el.dataset.b; UI.desde = UI.hasta = el.dataset.f; UI.vista = 'pend'; UI.tab = 'conciliar'; UI.sel.clear(); render(); window.scrollTo({ top: 0 }); },
+    irAging: () => { UI.desde = UI.tD; UI.hasta = UI.tH; UI.pFil = { b: +el.dataset.b, alto: false }; UI.vista = 'pend'; UI.tab = 'conciliar'; calcular(UI.desde, UI.hasta); const ids = Object.keys(RES); const i = +el.dataset.b; UI.banco = ids.find(id => [...RES[id].soloSis, ...RES[id].soloBan].some(x => riesgo(x).b === i)) || UI.banco; render(); window.scrollTo({ top: 0 }); },
+    irControl: () => { const k = el.dataset.k; if (k === 'pend' || k === 'seguimiento') { UI.desde = UI.tD; UI.hasta = UI.tH; UI.vista = k; UI.tab = 'conciliar'; } else UI.tab = k; render(); window.scrollTo({ top: 0 }); },
+    abrirItem: () => { UI.banco = el.dataset.b; UI.desde = UI.tD; UI.hasta = UI.tH; UI.vista = 'pend'; UI.pFil = { b: -1, alto: false }; UI.tab = 'conciliar'; UI.foco = el.dataset.id; UI.sel.clear(); render(); },
     rango: () => {
       const fs = Object.keys(ST.sis).sort(); const last = fs.length ? fs[fs.length - 1] : hoy();
       if (el.dataset.k === 'dia') { UI.desde = UI.hasta = last; }
@@ -2154,15 +2535,39 @@ document.addEventListener('click', e => {
     },
     guardarCierre: async () => {
       const c = datosCierre(UI.banco); if (!c) return;
+      const g = c.guardado; if (estadoCierre(g) === 'aprobado') return avisoCerrado(g);
       c.I.nota = ($('#cierreNota') || {}).value || '';
+      const datos = { ...snapshotCierre(c), estado: 'preparado', preparado_por: usr(), preparado_at: ahora(), historial: [...(g?.datos?.historial || []), { ts: ahora(), por: usr(), accion: g ? 'actualizado' : 'preparado', nota: `Diferencia ${fmt(c.resid)}${c.I.nota ? ' · ' + c.I.nota : ''}` }] };
       let row;
-      try { row = await dbCierre({ banco: c.bid, desde: c.desde, hasta: c.hasta, datos: snapshotCierre(c), diferencia: c.resid, nota: c.I.nota || null }); } catch (e) { return; }
+      try { row = await dbCierre({ banco: c.bid, desde: c.desde, hasta: c.hasta, datos, diferencia: c.resid, nota: c.I.nota || null }); } catch (e) { return; }
       ST.cierres = (ST.cierres || []).filter(x => !(x.banco === row.banco && x.desde === row.desde && x.hasta === row.hasta)).concat(row);
       delete UI.cierreIn[claveCierre(c.bid)]; render();
     },
+    aprobarCierre: async () => {
+      const c = datosCierre(UI.banco); if (!c) return;
+      const falta = bloqueosCierre(c); if (falta.length) return toast(falta[0]);
+      const g = c.guardado; c.I.nota = ($('#cierreNota') || {}).value || c.I.nota || '';
+      const cambio = g && (Math.abs(+g.diferencia - c.resid) >= 0.005 || (g.datos?.partidas || []).length !== c.pendS.length + c.pendB.length);
+      const datos = { ...snapshotCierre(c), estado: 'aprobado', preparado_por: g?.datos?.preparado_por || g?.created_by || usr(), preparado_at: g?.datos?.preparado_at || g?.created_at || ahora(),
+        aprobado_por: usr(), aprobado_at: ahora(), historial: [...(g?.datos?.historial || []), { ts: ahora(), por: usr(), accion: 'aprobado', nota: `${c.pendS.length + c.pendB.length} partidas pendientes, diferencia ${fmt(c.resid)}${cambio ? ' · hubo cambios desde que se preparó' : ''}${c.I.nota ? ' · ' + c.I.nota : ''}` }] };
+      let row;
+      try { row = await dbCierre({ banco: c.bid, desde: c.desde, hasta: c.hasta, datos, diferencia: c.resid, nota: c.I.nota || null }, 'Cierre aprobado: el período quedó cerrado'); } catch (e) { return; }
+      ST.cierres = (ST.cierres || []).filter(x => !(x.banco === row.banco && x.desde === row.desde && x.hasta === row.hasta)).concat(row);
+      delete UI.cierreIn[claveCierre(c.bid)]; UI.sel.clear(); render();
+    },
+    reabrirAbrir: () => { UI.reabrir = true; render(); const i = $('#motivoReabrir'); if (i) i.focus(); },
+    reabrirCancelar: () => { UI.reabrir = false; render(); },
+    reabrirCierre: async () => {
+      const c = datosCierre(UI.banco); const g = c && c.guardado; if (!g) return;
+      const motivo = (($('#motivoReabrir') || {}).value || '').trim();
+      if (motivo.length < 8) return toast('Escriba el motivo para reabrir (mínimo 8 letras)');
+      const datos = { ...g.datos, estado: 'reabierto', reabierto_por: usr(), reabierto_at: ahora(), motivo_reapertura: motivo, historial: [...(g.datos.historial || []), { ts: ahora(), por: usr(), accion: 'reabierto', nota: motivo }] };
+      let row; try { row = await dbCierreUpd(g.id, datos, 'Período reabierto'); } catch (e) { return; }
+      ST.cierres = ST.cierres.map(x => x.id === g.id ? row : x); UI.reabrir = false; render();
+    },
     verCierre: () => { UI.verCierre = UI.verCierre == el.dataset.id ? null : el.dataset.id; UI.confirm = null; render(); },
     abrirCierre: () => { const c = ST.cierres.find(x => x.id == el.dataset.id); if (!c) return; UI.desde = c.desde; UI.hasta = c.hasta; UI.banco = c.banco; UI.vista = 'cierre'; UI.tab = 'conciliar'; render(); asegurarMovs(c.desde).then(render); },
-    borrarCierre: async () => { const id = el.dataset.id; try { await dbBorrarCierre(id); } catch (e) { return; } ST.cierres = ST.cierres.filter(x => x.id != id); UI.confirm = null; UI.verCierre = null; render(); },
+    borrarCierre: async () => { const id = el.dataset.id; const cc = ST.cierres.find(x => x.id == id); if (estadoCierre(cc) === 'aprobado') return toast('Un cierre aprobado no se puede borrar. Reábralo primero.'); try { await dbBorrarCierre(id); } catch (e) { return; } ST.cierres = ST.cierres.filter(x => x.id != id); UI.confirm = null; UI.verCierre = null; render(); },
     abrirCaso: () => { if (!(ST.empleados || []).length && !ejemplo) toast('No se pudo cargar la lista de empleados'); UI.casoAbierto = el.dataset.id; UI.justAbierto = null; render(); },
     cancelarCaso: () => { UI.casoAbierto = null; render(); },
     crearCaso: async () => {
@@ -2197,7 +2602,7 @@ document.addEventListener('click', e => {
       const id = el.dataset.id, nota = ($('#casoNota') || {}).value || ''; const c0 = ST.casos.find(k => k.id == id);
       const sigue = sigueStatus(c0);
       let c; try { c = await dbActualizarCaso(id, { estado: 'confirmado', historial: [...(c0.historial || []), { ts: ahora(), por: usr(), accion: 'confirmado', nota }] }, 'Confirmado'); } catch (e) { return; }
-      if (sigue) { const n = `Confirmado en seguimiento${nota ? ': ' + nota : ''}${c0.instruccion ? ' (' + c0.instruccion + ')' : ''}`; try { await dbJust([c0.item_id], n); ST.man.just[c0.item_id] = { nota: n, por: usr() }; } catch (e) {} }
+      if (sigue && !cierreDeIds([c0.item_id])) { const n = `Confirmado en seguimiento${nota ? ': ' + nota : ''}${c0.instruccion ? ' (' + c0.instruccion + ')' : ''}`; try { await dbJust([c0.item_id], n); ST.man.just[c0.item_id] = { nota: n, por: usr() }; } catch (e) {} }
       ST.casos = ST.casos.map(k => k.id == id ? c : k); UI.casoNota = null; render();
     },
     devolverCaso: async () => {
@@ -2212,11 +2617,16 @@ document.addEventListener('click', e => {
       if (error || !data) return toast('No se pudo marcar: ' + (error?.message || 'el caso ya no está pendiente'));
       const { data: mios } = await SB.from('cb_casos').select('*').order('created_at'); ST.casos = mios || []; toast('Marcado como corregido. Gracias.'); render();
     },
+    guardarControles: () => {
+      ST.cfg.umbral = Math.max(0, +($('#cUmbral').value) || 0); ST.cfg.transito = Math.max(0, Math.min(15, Math.round(+($('#cTransito').value) || 0))); ST.cfg.aprobOtro = $('#cAprobOtro').checked;
+      dbCfg('Controles guardados').catch(() => {}); render();
+    },
     guardarTolerancia: () => { const v = Math.max(0, +($('#tolerancia').value) || 0); ST.cfg.tolerancia = Math.round(v * 100) / 100; dbCfg('Tolerancia guardada').catch(() => {}); render(); },
     moverTodos: async () => {
       const r = RES[UI.banco]; const lista = r.soloSis.filter(x => (x.flags || []).some(f => f.t === 'otroBanco'));
       const porFecha = {};
       for (const x of lista) { const u = ubicarSis(x.id); if (!u) continue; const a = x.flags.find(f => f.t === 'otroBanco').banco; (porFecha[u.f] ||= []).push({ de: u.b, idx: u.idx, a }); }
+      if (bloqueadoBF(Object.entries(porFecha).flatMap(([f, ms]) => ms.flatMap(m => [[m.de, f], [m.a, f]])))) { UI.confirm = null; return render(); }
       let n = 0;
       for (const [f, movs] of Object.entries(porFecha)) {
         const d = structuredClone(ST.sis[f]); movs.forEach(m => moverItem(d, m.de, m.idx, m.a));
@@ -2252,10 +2662,11 @@ document.addEventListener('click', e => {
     recargarBitacora: async () => { await cargarBitacora(); render(); },
     masBitacora: async () => { await cargarBitacora(true); render(); },
     exportar, copiarPend: copiarPendientes,
-    vincular1: async () => { const l = { s: [el.dataset.s], b: [el.dataset.b], nota: '' }; try { await dbLink(l); } catch (e) { return; } ST.man.links.push(l); render(); },
+    vincular1: async () => { if (bloqueado([el.dataset.s, el.dataset.b])) return; const l = { s: [el.dataset.s], b: [el.dataset.b], nota: '' }; try { await dbLink(l); } catch (e) { return; } ST.man.links.push(l); render(); },
     vincularSel: async () => {
       const r = RES[UI.banco]; const all = new Map([...r.soloSis, ...r.soloBan, ...r.justificados].map(x => [x.id, x]));
       const sel = [...UI.sel].map(id => all.get(id)).filter(Boolean);
+      if (bloqueado(sel.map(x => x.id))) return;
       const nota = ($('#notaSel') || {}).value || '';
       const l = { s: sel.filter(x => x.lado === 's').map(x => x.id), b: sel.filter(x => x.lado === 'b').map(x => x.id), nota };
       const yaJust = sel.filter(x => ST.man.just[x.id]).map(x => x.id);
@@ -2263,18 +2674,20 @@ document.addEventListener('click', e => {
       yaJust.forEach(id => delete ST.man.just[id]);
       ST.man.links.push(l); UI.sel.clear(); render();
     },
-    justificar: () => { UI.justAbierto = el.dataset.id; render(); const i = $('#justNota'); if (i) i.focus(); },
+    justificar: () => { if (bloqueado([el.dataset.id])) return; UI.justAbierto = el.dataset.id; render(); const i = $('#justNota'); if (i) i.focus(); },
     cancelarJust: () => { UI.justAbierto = null; render(); },
     confirmarJust: async () => {
       const id = el.dataset.id, nota = (($('#justNota') || {}).value || '').trim(), yaEstaba = !!ST.man.just[id];
+      if (bloqueado([id])) return;
       try { await dbJust([id], nota, yaEstaba ? 'Nota guardada' : 'Movido a Justificados'); } catch (e) { return; }
       ST.man.just[id] = { nota, por: usr() }; UI.sel.delete(id); UI.justAbierto = null; render();
     },
-    justificarSel: async () => { const nota = ($('#notaSel') || {}).value || ''; const ids = [...UI.sel]; try { await dbJust(ids, nota, 'Movidos a Justificados'); } catch (e) { return; } ids.forEach(id => ST.man.just[id] = { nota, por: usr() }); UI.sel.clear(); render(); },
-    desjustificar: async () => { const id = el.dataset.id; try { await dbDesJust([id]); } catch (e) { return; } delete ST.man.just[id]; render(); },
+    justificarSel: async () => { const nota = ($('#notaSel') || {}).value || ''; const ids = [...UI.sel]; if (bloqueado(ids)) return; try { await dbJust(ids, nota, 'Movidos a Justificados'); } catch (e) { return; } ids.forEach(id => ST.man.just[id] = { nota, por: usr() }); UI.sel.clear(); render(); },
+    desjustificar: async () => { const id = el.dataset.id; if (bloqueado([id])) return; try { await dbDesJust([id]); } catch (e) { return; } delete ST.man.just[id]; render(); },
     limpiarSel: () => { UI.sel.clear(); render(); },
     deshacer: async () => {
       const ids = el.dataset.ids.split('§');
+      if (bloqueado(ids)) return;
       try {
         if (el.dataset.tipo === 'manual' && el.dataset.link !== '') {
           const idx = +el.dataset.link, l = ST.man.links[idx];
@@ -2306,6 +2719,8 @@ document.addEventListener('click', e => {
       const habia = !!ST.sis[f];
       const C = habia ? comparacion(f) : null;
       const d = C ? C.nuevo : nuevoDiaDesdePrev(f);
+      const cerr = seccionesCerradasCambiadas(f, d);
+      if (cerr.length) return toast(`No se guardó: el ${fdl(f)} cambia ${cerr.map(bancoN).join(', ')}, que ${cerr.length > 1 ? 'están' : 'está'} en un período cerrado. Reábralo en Cierre si la corrección es necesaria.`);
       el.disabled = true; el.textContent = 'Guardando…';
       try { await dbSis(f, d, ''); } catch (e) { el.disabled = false; return; }
       ST.sis[f] = d;
@@ -2332,6 +2747,8 @@ document.addEventListener('click', e => {
     cmpAsignarTodos: () => { const v = $('#cmpTodosOrigen').value; const C = UI.cmp; if (!C) return; C.cambios.forEach((c, i) => { if (c.tipo_error !== 'cargo') (C.edit[i] ||= {}).origen_id = v; }); render(); },
     verRotas: () => { UI.verRotas = !UI.verRotas; render(); },
     quitarRota: async () => {
+      const ids = el.dataset.k === 'link' ? (() => { const l = ST.man.links.find(x => x.id == el.dataset.id); return l ? [...l.s, ...l.b] : []; })() : [el.dataset.id];
+      if (bloqueado(ids)) return;
       try {
         if (el.dataset.k === 'link') { const id = +el.dataset.id || el.dataset.id; await dbBorrarLink(id); ST.man.links = ST.man.links.filter(l => l.id != id); }
         else { await dbDesJust([el.dataset.id]); delete ST.man.just[el.dataset.id]; }
@@ -2340,6 +2757,7 @@ document.addEventListener('click', e => {
     },
     quitarRotasTodas: async () => {
       const R = referenciasRotas();
+      R.links = R.links.filter(l => !cierreDeIds([...l.s, ...l.b])); R.just = R.just.filter(id => !cierreDeIds([id]));
       try {
         for (const l of R.links) { await dbBorrarLink(l.id); ST.man.links = ST.man.links.filter(x => x.id !== l.id); }
         if (R.just.length) { await dbDesJust(R.just); R.just.forEach(id => delete ST.man.just[id]); }
@@ -2371,8 +2789,8 @@ document.addEventListener('click', e => {
     editarSis: () => { const f = el.dataset.f; UI.sisFecha = f; UI.sisTexto = ST.sis[f].texto || ''; UI.sisPrev = null; render(); window.scrollTo({ top: 0 }); },
     confirm: () => { UI.confirm = el.dataset.k; render(); },
     cancelConfirm: () => { UI.confirm = null; render(); },
-    borrarMov: async () => { const b = el.dataset.id; try { await dbBorrarMovs(b); } catch (e) { return; } delete ST.mov[b]; UI.confirm = null; render(); },
-    borrarSis: async () => { const f = el.dataset.f; try { await dbBorrarSis(f); } catch (e) { return; } delete ST.sis[f]; UI.confirm = null; UI.verDia = null; render(); },
+    borrarMov: async () => { const b = el.dataset.id; const cc = (ST.cierres || []).find(c => c.banco === b && estadoCierre(c) === 'aprobado'); if (cc) return avisoCerrado(cc); try { await dbBorrarMovs(b); } catch (e) { return; } delete ST.mov[b]; UI.confirm = null; render(); },
+    borrarSis: async () => { const f = el.dataset.f; if (bloqueadoBF(Object.keys(ST.sis[f]?.secciones || {}).map(b => [b, f]))) return; try { await dbBorrarSis(f); } catch (e) { return; } delete ST.sis[f]; UI.confirm = null; UI.verDia = null; render(); },
     recargarTodo: () => { FASE.msg = ''; arrancar(); },
     recargar: async () => { FASE.v = 'cargando'; render(); try { await cargar(); } catch (e) { FASE.v = 'error'; FASE.msg = 'No se pudo cargar: ' + (e.message || e); } render(); },
     salir: async () => { try { await SB.auth.signOut(); } catch (e) {} USER = null; ST = vacio(); FASE.v = 'login'; render(); },
@@ -2391,6 +2809,7 @@ document.addEventListener('click', e => {
       const u = ubicarSis(el.dataset.s); const a = el.dataset.a;
       if (!u) return toast('No se encontró el registro');
       const f = u.f, de = u.b, idx = u.idx;
+      if (bloqueadoBF([[de, f], [a, f]])) return;
       const d = structuredClone(ST.sis[f]);
       moverItem(d, de, +idx, a);
       try { await dbSis(f, d, `Movido a ${bancoN(a)}. Corríjalo también en su sistema.`); } catch (e) { return; }
@@ -2400,6 +2819,7 @@ document.addEventListener('click', e => {
       const f = el.dataset.f, a = el.dataset.b, i = +el.dataset.i;
       const d = structuredClone(ST.sis[f]); const it = d.secciones[a].items[i];
       if (!it || !it.movidoDe) return;
+      if (bloqueadoBF([[a, f], [it.movidoDe, f]])) return;
       const orig = d.secciones[it.movidoDe]?.items.find(x => x.movidoA === a && x.doc === it.doc && x.dir === it.dir && E.cents(x.monto) === E.cents(it.monto));
       if (orig) delete orig.movidoA;
       d.secciones[a].items.splice(i, 1);
@@ -2411,6 +2831,7 @@ document.addEventListener('click', e => {
     },
     quitarAgregado: async () => {
       const f = el.dataset.f, bid = el.dataset.b, i = +el.dataset.i;
+      if (bloqueadoBF([[bid, f]])) return;
       const d = structuredClone(ST.sis[f]); const sec = d.secciones[bid]; const it = sec.items[i];
       if (!it || !it.agregado) return;
       sec.items.splice(i, 1); sec.egr = (sec.egr || 0) - it.monto;
@@ -2437,6 +2858,7 @@ document.addEventListener('change', async e => {
   if (t.dataset.act === 'sel') { t.checked ? UI.sel.add(t.dataset.id) : UI.sel.delete(t.dataset.id); render(); return; }
   if (t.dataset.act === 'selErr') { t.checked ? UI.selErr.add(+t.dataset.id) : UI.selErr.delete(+t.dataset.id); render(); return; }
   if (t.dataset.act === 'selErrTodos') { if (t.checked) correccionesFiltradas(false).forEach(c => UI.selErr.add(c.id)); else UI.selErr.clear(); render(); return; }
+  if (t.id === 'pOrd') { UI.pOrd = t.value; try { localStorage.setItem('concilia.pend', JSON.stringify({ o: UI.pOrd })); } catch (e) {} render(); return; }
   if (t.id === 'errCargos') { UI.errCargos = t.checked; render(); return; }
   if (t.dataset.cmp && UI.cmp) { (UI.cmp.edit[+t.dataset.i] ||= {})[t.dataset.cmp] = t.value; return; }
   if (t.dataset.corr) {
